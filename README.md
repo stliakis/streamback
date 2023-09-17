@@ -34,7 +34,7 @@ you the option to do so if you need it in order to make more simple the communic
 ----
 
 ```bash
-pip install Streamback
+pip install streamback
 ```
 
 
@@ -46,9 +46,9 @@ pip install Streamback
 #### Consumer
 
 ```python
-from Streamback import Streamback, KafkaStream, RedisStream
+from streamback import Streamback, KafkaStream, RedisStream
 
-Streamback = Streamback(
+streamback = Streamback(
     "example_consumer_app",
     main_stream=KafkaStream("kafka:9092"),
     feedback_stream=RedisStream("redis:6379"),
@@ -58,21 +58,21 @@ Streamback = Streamback(
 def test_hello(context, message):
     print("received: {value}".format(value=message.value))
 
-Streamback.start()
+streamback.start()
 ```
 
 #### Producer
 
 ```python
-from Streamback import Streamback, KafkaStream, RedisStream
+from streamback import Streamback, KafkaStream, RedisStream
 
-Streamback = Streamback(
+streamback = Streamback(
     "example_consumer_app",
     main_stream=KafkaStream("kafka:9092"),
     feedback_stream=RedisStream("redis:6379"),
 )
 
-Streamback.send("test_hello", "Hello world!")
+streamback.send("test_hello", "Hello world!")
 ```
 
 ----
@@ -81,9 +81,9 @@ Streamback.send("test_hello", "Hello world!")
 #### Consumer
 
 ```python
-from Streamback import Streamback, KafkaStream, RedisStream
+from streamback import Streamback, KafkaStream, RedisStream
 
-Streamback = Streamback(
+streamback = Streamback(
     "example_consumer_app",
     main_stream=KafkaStream("kafka:9092"),
     feedback_stream=RedisStream("redis:6379"),
@@ -94,15 +94,15 @@ def test_hello_stream(context, message):
     print("received: {value}".format(value=message.value))
     message.respond("Hello from the consumer!")
 
-Streamback.start()
+streamback.start()
 ```
 
 #### Producer
 
 ```python
-from Streamback import Streamback, KafkaStream, RedisStream
+from streamback import Streamback, KafkaStream, RedisStream
 
-Streamback = Streamback(
+streamback = Streamback(
     "example_producer_app",
     main_stream=KafkaStream("kafka:9092"),
     feedback_stream=RedisStream("redis:6379"),
@@ -118,10 +118,10 @@ print(message)
 #### Consumer
 
 ```python
-from Streamback import Streamback, KafkaStream, RedisStream
+from streamback import Streamback, KafkaStream, RedisStream
 import time
 
-Streamback = Streamback(
+streamback = Streamback(
     "example_consumer_app",
     main_stream=KafkaStream("kafka:9092"),
     feedback_stream=RedisStream("redis:6379"),
@@ -134,15 +134,15 @@ def test_hello_stream(context, message):
         message.respond("Hello #{i} from the consumer!".format(i=i))
         time.sleep(2)
 
-Streamback.start()
+streamback.start()
 ```
 
 #### Producer
 
 ```python
-from Streamback import Streamback, KafkaStream, RedisStream
+from streamback import Streamback, KafkaStream, RedisStream
 
-Streamback = Streamback(
+streamback = Streamback(
     "example_consumer_app",
     main_stream=KafkaStream("kafka:9092"),
     feedback_stream=RedisStream("redis:6379"),
@@ -166,7 +166,7 @@ The StreambackRouter helps with spliting the consumer logic into different files
 
 #### some_consumers.py
 ```python
-from Streamback import StreambackRouter
+from streamback import StreambackRouter
 
 router = StreambackRouter()
 
@@ -178,16 +178,16 @@ def test_hello(context, message):
 
 #### my_consumer_app.py
 ```python
-from Streamback import Streamback, KafkaStream, RedisStream
-from Streamback.router import StreambackRouter
+from streamback import Streamback, KafkaStream, RedisStream
+from streamback.router import StreambackRouter
 
 from some_consumers import router as some_consumers_router
 
-Streamback = Streamback(
+streamback = Streamback(
     "example_consumer_app",
     main_stream=KafkaStream("kafka:9092"),
     feedback_stream=RedisStream("redis:6379"),
 )
 
-Streamback.include_router(some_consumers_router)
+streamback.include_router(some_consumers_router)
 ```
