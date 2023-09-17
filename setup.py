@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="streamback",
-    version="0.0.1",
+    version="0.0.12",
     author='Stefanos Liakis',
     author_email='stliakis@gmail.com',
     description="2-way streams for your microservices",

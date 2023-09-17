@@ -2,7 +2,7 @@ import sys
 
 import time
 
-sys.path.append("src")
+sys.path.append("streamback")
 
 from streamback import Streamback
 from router import Router
