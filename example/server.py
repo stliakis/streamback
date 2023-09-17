@@ -4,16 +4,13 @@ import time
 
 sys.path.append("streamback")
 
-from streamback import Streamback
-from router import Router
-from streams import KafkaStream, RedisStream
+from streamback import Streamback, KafkaStream, RedisStream
 
 streamback = Streamback(
     "main_app",
     main_stream=KafkaStream("kafka:9092"),
     feedback_stream=RedisStream("redis:6379"),
 )
-
 
 
 @streamback.listen("test_streaming")

@@ -1,4 +1,4 @@
-## Streamback - 2-way streams for your microservices
+## 2-way streams for your microservices
 
 ### What is a 2-way stream?
 

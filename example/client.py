@@ -1,10 +1,7 @@
 import sys
 import time
 
-sys.path.append("streamback")
-
-from streamback import Streamback
-from streams import KafkaStream, RedisStream
+from streamback import Streamback, KafkaStream, RedisStream
 
 #
 # streamback = Streamback(

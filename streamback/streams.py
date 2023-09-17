@@ -3,9 +3,9 @@ from logging import INFO, ERROR
 import redis
 import time
 from confluent_kafka import Producer, Consumer, KafkaError, KafkaException
-from exceptions import FeedbackTimeout
-from message import Message
-from utils import log, listify
+from .exceptions import FeedbackTimeout
+from .message import Message
+from .utils import log, listify
 
 
 class Stream(object):

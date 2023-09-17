@@ -1,11 +1,11 @@
 from logging import INFO, ERROR, WARNING
 import uuid
 
-from context import ConsumerContext
-from events import Events
-from listener import Listener
-from streams import KafkaStream
-from utils import log
+from .context import ConsumerContext
+from .events import Events
+from .listener import Listener
+from .streams import KafkaStream
+from .utils import log
 
 
 class Streamback(object):
