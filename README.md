@@ -54,7 +54,7 @@ streamback = Streamback(
     feedback_stream=RedisStream("redis:6379"),
 )
 
-@Streamback.listen("test_hello")
+@streamback.listen("test_hello")
 def test_hello(context, message):
     print("received: {value}".format(value=message.value))
 
@@ -89,7 +89,7 @@ streamback = Streamback(
     feedback_stream=RedisStream("redis:6379"),
 )
 
-@Streamback.listen("test_hello_stream")
+@streamback.listen("test_hello_stream")
 def test_hello_stream(context, message):
     print("received: {value}".format(value=message.value))
     message.respond("Hello from the consumer!")
@@ -127,7 +127,7 @@ streamback = Streamback(
     feedback_stream=RedisStream("redis:6379"),
 )
 
-@Streamback.listen("test_hello_stream")
+@streamback.listen("test_hello_stream")
 def test_hello_stream(context, message):
     print("received: {value}".format(value=message.value))
     for i in range(10):
