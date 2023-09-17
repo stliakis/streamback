@@ -37,8 +37,6 @@ you the option to do so if you need it in order to make more simple the communic
 pip install streamback
 ```
 
-
-
 ## Examples
 
 ### One way stream consumer-producer
