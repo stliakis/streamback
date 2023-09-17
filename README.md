@@ -65,7 +65,7 @@ streamback.start()
 from streamback import Streamback, KafkaStream, RedisStream
 
 streamback = Streamback(
-    "example_consumer_app",
+    "example_producer_app",
     main_stream=KafkaStream("kafka:9092"),
     feedback_stream=RedisStream("redis:6379"),
 )
@@ -141,7 +141,7 @@ streamback.start()
 from streamback import Streamback, KafkaStream, RedisStream
 
 streamback = Streamback(
-    "example_consumer_app",
+    "example_producer_app",
     main_stream=KafkaStream("kafka:9092"),
     feedback_stream=RedisStream("redis:6379"),
 )
