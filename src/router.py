@@ -1,7 +1,7 @@
 from listener import Listener
 
 
-class BuslaneRouter(object):
+class Router(object):
     listeners = []
 
     def listen(self, topic):

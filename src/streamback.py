@@ -8,7 +8,7 @@ from streams import KafkaStream
 from utils import log
 
 
-class Buslane(object):
+class Streamback(object):
     def __init__(self, name, main_stream, feedback_stream=None, feedback_timeout=60, feedback_ttl=300):
         self.name = name
 
@@ -30,7 +30,7 @@ class Buslane(object):
         self.feedback_timeout = feedback_timeout
         self.feedback_ttl = feedback_ttl
 
-        log(INFO, "BUSLANE_INITIALIZED[name={name},main_stream={main_stream},feedback_stream={feedback_stream}]".format(
+        log(INFO, "STREAMBACK_INITIALIZED[name={name},main_stream={main_stream},feedback_stream={feedback_stream}]".format(
             name=name, main_stream=main_stream, feedback_stream=feedback_stream))
 
     def get_payload_metadata(self):
@@ -196,4 +196,4 @@ class FeedbackLane(object):
 
     def assert_feedback_stream(self):
         if not self.feedback_stream:
-            raise Exception("Feedback stream not configured, Buslane is configured as a one way stream")
+            raise Exception("Feedback stream not configured, Streamback is configured as a one way stream")

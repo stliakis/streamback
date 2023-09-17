@@ -7,7 +7,7 @@ from streamback import Streamback
 from streams import KafkaStream, RedisStream
 
 #
-# streamback = Buslane(
+# streamback = Streamback(
 #     "logs",
 #     main_stream=KafkaStream(["kafka:9092"]),
 #     feedback_stream=RedisStream("redis:6379"),

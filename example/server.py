@@ -5,7 +5,7 @@ import time
 sys.path.append("src")
 
 from streamback import Streamback
-from router import BuslaneRouter
+from router import Router
 from streams import KafkaStream, RedisStream
 
 streamback = Streamback(
@@ -36,7 +36,7 @@ def test_hello(context, message):
         time.sleep(0.1)
 
 
-# router = BuslaneRouter()
+# router = Router()
 #
 # streamback.include_router(router)
 #
