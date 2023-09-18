@@ -5,16 +5,22 @@ import uuid
 from .context import ConsumerContext
 from .events import Events
 from .listener import Listener
-from .streams import KafkaStream
+from .streams import KafkaStream, ParsedStreams
 from .utils import log
 
 
 class Streamback(object):
-    def __init__(self, name, main_stream, feedback_stream=None, feedback_timeout=60, feedback_ttl=300):
+    def __init__(self, name, streams=None, main_stream=None, feedback_stream=None, feedback_timeout=60,
+                 feedback_ttl=300):
         self.name = name
 
-        self.main_stream = main_stream
-        self.feedback_stream = feedback_stream
+        if streams:
+            parsed_streams = ParsedStreams(streams)
+            self.main_stream = parsed_streams.main_stream
+            self.feedback_stream = parsed_streams.feedback_stream
+        else:
+            self.main_stream = main_stream
+            self.feedback_stream = feedback_stream
 
         if self.main_stream:
             self.main_stream.initialize(name)
@@ -33,7 +39,7 @@ class Streamback(object):
 
         log(INFO,
             "STREAMBACK_INITIALIZED[name={name},main_stream={main_stream},feedback_stream={feedback_stream}]".format(
-                name=name, main_stream=main_stream, feedback_stream=feedback_stream))
+                name=name, main_stream=self.main_stream, feedback_stream=self.feedback_stream))
 
     def get_payload_metadata(self):
         return {

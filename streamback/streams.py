@@ -3,7 +3,7 @@ from logging import INFO, ERROR
 import redis
 import time
 from confluent_kafka import Producer, Consumer, KafkaError, KafkaException
-from .exceptions import FeedbackTimeout
+from .exceptions import FeedbackTimeout, InvalidSteamsString
 from .message import Message
 from .utils import log, listify
 
@@ -138,3 +138,30 @@ class RedisStream(Stream):
                 payload=payload,
                 key=None,
             )
+
+
+class ParsedStreams(object):
+    def __init__(self, streams_string):
+        self.main_stream = None
+        self.feedback_stream = None
+
+        streams = streams_string.split("&")
+        for stream in streams:
+            stream_category = stream.split("=")[0]
+            stream_value = stream.split("=")[1]
+            stream_type = stream_value.split("://")[0]
+            stream_hosts = stream_value.split("://")[1]
+            if stream_type == "kafka":
+                stream = KafkaStream(stream_hosts)
+            elif stream_type == "redis":
+                stream = RedisStream(stream_hosts)
+            else:
+                raise Exception("Unknown stream type: %s" % stream_type)
+
+            if stream_category == "main":
+                self.main_stream = stream
+            elif stream_category == "feedback":
+                self.feedback_stream = stream
+
+        if not self.main_stream:
+            raise InvalidSteamsString(streams_string, "Main stream is required")

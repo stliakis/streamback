@@ -6,8 +6,7 @@ from streamback import Streamback, KafkaStream, RedisStream, Listener
 
 streamback = Streamback(
     "main_app",
-    main_stream=KafkaStream("kafka:9092"),
-    feedback_stream=RedisStream("redis:6379"),
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
 
@@ -23,12 +22,7 @@ def test_streaming(context, message):
 @streamback.listen("test_hello")
 def test_hello(context, message):
     print("received: {value}".format(value=message.value))
-
-    for i in range(10):
-        message.respond({
-            "message": "hello back {}".format(i)
-        })
-        time.sleep(0.1)
+    raise Exception()
 
 
 @streamback.listen("new_log")

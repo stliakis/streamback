@@ -220,6 +220,20 @@ streamback.include_router(some_consumers_router)
 streamback.start()
 ```
 
+## Streams connection string
+You can use the following format for the main and feedback streams for a more compact way of defining the streams
+
+```python
+
+from streamback import Streamback
+
+streamback = Streamback(
+    "example_consumer_app",
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
+)
+
+```
+
 ### Why python 2.7 compatible?
 
 Streamback has been created for usage in car.gr's systems which has some legacy python 2.7 services. We are are planing

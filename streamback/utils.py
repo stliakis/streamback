@@ -1,9 +1,15 @@
 import logging
 
+logging.basicConfig(
+    format='streamback - %(levelname)s - %(message)s  ',
+    datefmt='%d-%b-%y %H:%M:%S',
+    level=logging.INFO
+)
+
+logger = logging.getLogger("streamback")
 
 def log(level, msg):
-    print(level, msg)
-    logging.log(level, msg)
+    logger.log(level, msg)
 
 
 def listify(obj):
