@@ -39,7 +39,7 @@ class KafkaStream(Stream):
             {
                 "bootstrap.servers": ",".join(self.kafka_hosts),
                 "linger.ms": 0,
-                "batch.size": 1,
+                "batch.size": 10,
                 "acks": 1,
             }
         )
@@ -50,10 +50,9 @@ class KafkaStream(Stream):
                 "bootstrap.servers": ",".join(self.kafka_hosts),
                 "group.id": self.group_name,
                 "auto.offset.reset": "latest",
-                "auto.commit.interval.ms": 1,
+                "auto.commit.interval.ms": 500,
                 "fetch.min.bytes": 1,
-                "fetch.wait.max.ms": 0,
-                "enable.auto.commit": True,
+                "enable.auto.commit": True
             }
         )
 
@@ -75,7 +74,7 @@ class KafkaStream(Stream):
         )
 
         while True:
-            msg = consumer.poll(0.5)
+            msg = consumer.poll(1)
 
             if timeout:
                 time_since_begin = time.time() - begin
