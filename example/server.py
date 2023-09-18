@@ -2,9 +2,7 @@ import sys
 
 import time
 
-sys.path.append("streamback")
-
-from streamback import Streamback, KafkaStream, RedisStream
+from streamback import Streamback, KafkaStream, RedisStream, Listener
 
 streamback = Streamback(
     "main_app",
@@ -33,7 +31,23 @@ def test_hello(context, message):
         time.sleep(0.1)
 
 
+@streamback.listen("new_log")
+class LogsConsumer(Listener):
+    logs = []
+
+    def consume(self, context, message):
+        self.logs.append(message.value)
+        if len(self.logs) > 100:
+            self.flush_logs()
+
+    def flush_logs(self):
+        pass
+        # database_commit(self.logs)
+
+
 # router = Router()
+
+
 #
 # streamback.include_router(router)
 #

@@ -21,8 +21,8 @@ services:
 
   client:
     build:
-      context: .
-      dockerfile: client.dockerfile
+      context: ..
+      dockerfile: example/client.dockerfile
     volumes:
       - ..:/app
     depends_on:
@@ -31,8 +31,8 @@ services:
 
   server:
     build:
-      context: .
-      dockerfile: server.dockerfile
+      context: ..
+      dockerfile: example/server.dockerfile
     volumes:
       - ..:/app
     depends_on:

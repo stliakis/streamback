@@ -1,3 +1,4 @@
+import inspect
 from logging import INFO, ERROR, WARNING
 import uuid
 
@@ -30,8 +31,9 @@ class Streamback(object):
         self.feedback_timeout = feedback_timeout
         self.feedback_ttl = feedback_ttl
 
-        log(INFO, "STREAMBACK_INITIALIZED[name={name},main_stream={main_stream},feedback_stream={feedback_stream}]".format(
-            name=name, main_stream=main_stream, feedback_stream=feedback_stream))
+        log(INFO,
+            "STREAMBACK_INITIALIZED[name={name},main_stream={main_stream},feedback_stream={feedback_stream}]".format(
+                name=name, main_stream=main_stream, feedback_stream=feedback_stream))
 
     def get_payload_metadata(self):
         return {
@@ -115,9 +117,18 @@ class Streamback(object):
 
         self.feedback_stream.send(topic, payload)
 
-    def listen(self, topic):
+    def listen(self, topic=None):
         def decorator(func):
-            self.add_listener(Listener(topic=topic, function=func))
+            if inspect.isclass(func) and issubclass(func, Listener):
+                listener_class = func
+                listener = listener_class(
+                    topic=topic,
+                )
+                self.add_listener(listener)
+            else:
+                if not topic:
+                    raise Exception("topic is required when using a function as a listener")
+                self.add_listener(Listener(topic=topic, function=func))
 
             def wrapper_func(*args, **kwargs):
                 return func(*args, **kwargs)
@@ -147,7 +158,7 @@ class Streamback(object):
 
             listeners = self.listeners.get(message.topic, [])
             for listener in listeners:
-                listener.function(context, message)
+                listener.consume(context, message)
             self.send_feedback_end(message.feedback_topic)
 
     def add_listener(self, listener):

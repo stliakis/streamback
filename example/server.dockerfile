@@ -1,7 +1,9 @@
 FROM python:3.10-bullseye
 
+COPY . /app/
+
 WORKDIR /app/
 
-RUN pip install streamback==0.0.17
+RUN pip install .
 
 CMD ["python", "example/server.py"]

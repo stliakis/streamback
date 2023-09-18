@@ -1,4 +1,11 @@
 class Listener(object):
-    def __init__(self, topic, function):
-        self.topic = topic
-        self.function = function
+    topic = None
+    function = None
+
+    def __init__(self, topic=None, function=None):
+        self.topic = topic or self.topic
+        self.function = function or self.function
+
+    def consume(self, context, message):
+        if self.function:
+            self.function(context, message)
