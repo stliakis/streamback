@@ -2,6 +2,7 @@ import sys
 
 import time
 
+from streamback.retry_strategy import RetryStrategy
 from streamback import Streamback, KafkaStream, RedisStream, Listener
 
 streamback = Streamback(
@@ -19,10 +20,12 @@ def test_streaming(context, message):
         time.sleep(0.1)
 
 
-@streamback.listen("test_hello")
+@streamback.listen("test_hello", retry=RetryStrategy(retry_times=3))
 def test_hello(context, message):
     print("received: {value}".format(value=message.value))
-    raise Exception()
+    message.respond({
+        "message": "hello back"
+    })
 
 
 @streamback.listen("new_log")

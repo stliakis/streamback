@@ -2,9 +2,9 @@ import json
 from logging import INFO, ERROR
 import redis
 import time
-from confluent_kafka import Producer, Consumer, KafkaError, KafkaException
+from confluent_kafka import Producer, Consumer, KafkaError, KafkaException, TopicPartition
 from .exceptions import FeedbackTimeout, InvalidSteamsString
-from .message import Message
+from .message import Message, KafkaMessage
 from .utils import log, listify
 
 
@@ -49,10 +49,9 @@ class KafkaStream(Stream):
             {
                 "bootstrap.servers": ",".join(self.kafka_hosts),
                 "group.id": self.group_name,
-                "auto.offset.reset": "latest",
-                "auto.commit.interval.ms": 500,
+                "auto.offset.reset": "earliest",
                 "fetch.min.bytes": 1,
-                "enable.auto.commit": True
+                "enable.auto.commit": False
             }
         )
 
@@ -93,14 +92,15 @@ class KafkaStream(Stream):
             else:
                 payload = self.deserialize_payload(msg.value())
 
-                message = Message(
+                message = KafkaMessage(
+                    kafka_message=msg,
                     streamback=streamback,
                     topic=msg.topic(),
                     payload=payload,
                     key=msg.key(),
                 )
 
-                consumer.commit(msg)
+                message.ack = lambda: consumer.commit(msg)
 
                 yield message
 
@@ -132,12 +132,17 @@ class RedisStream(Stream):
 
             payload = self.deserialize_payload(value[1])
 
-            yield Message(
+            message = Message(
                 streamback=streamback,
                 topic=value[0].decode(),
                 payload=payload,
                 key=None,
             )
+
+            message.ack = lambda: True
+
+            yield message
+
 
 
 class ParsedStreams(object):

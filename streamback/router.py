@@ -4,10 +4,10 @@ from .listener import Listener
 class Router(object):
     listeners = []
 
-    def listen(self, topic):
+    def listen(self, topic, retry=None):
         def decorator(func):
             self.listeners.append(
-                Listener(topic=topic, function=func)
+                Listener(topic=topic, function=func, retry_strategy=retry)
             )
 
             def wrapper_func(*args, **kwargs):

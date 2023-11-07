@@ -20,8 +20,7 @@ docker compose run kafka
     
 ```bash
 
-docker compose build;
-docker compose run server;
+docker compose build && docker compose run server;
 
 ```
 
@@ -29,7 +28,6 @@ docker compose run server;
     
 ```bash
 
-docker compose build;
-docker compose run client
+docker compose build && docker compose run client
 
 ```
