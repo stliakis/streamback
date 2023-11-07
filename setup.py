@@ -5,7 +5,7 @@ with open('README.md', 'r') as fh:
 
 setup(
     name="streamback",
-    version="0.0.18",
+    version="0.0.20",
     author='Stefanos Liakis',
     author_email='stliakis@gmail.com',
     description="2-way streams for your microservices",
