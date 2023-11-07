@@ -5,7 +5,7 @@ with open('README.md', 'r') as fh:
 
 setup(
     name="streamback",
-    version="0.0.20",
+    version="0.0.21",
     author='Stefanos Liakis',
     author_email='stliakis@gmail.com',
     description="2-way streams for your microservices",
@@ -13,7 +13,7 @@ setup(
     long_description_content_type='text/markdown',
     packages=find_packages(),
     install_requires=[
-        "redis>=2.10.6", "confluent-kafka>=1.7.0"
+        "redis>=2.10.6", "confluent-kafka==1.7.0"
     ],
     classifiers=[
         'License :: OSI Approved :: MIT License',
