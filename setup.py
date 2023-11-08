@@ -1,7 +1,17 @@
 from setuptools import setup, find_packages
+import sys
 
 with open('README.md', 'r') as fh:
     long_description = fh.read()
+
+if sys.version_info == (2, 7):
+    REQUIRES = [
+        "redis>=2.10.6", "confluent-kafka==1.7.0"
+    ]
+else:
+    REQUIRES = [
+        "redis>=2.10.6", "confluent-kafka>=1.7.0"
+    ]
 
 setup(
     name="streamback",
@@ -12,9 +22,7 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     packages=find_packages(),
-    install_requires=[
-        "redis>=2.10.6", "confluent-kafka==1.7.0"
-    ],
+    install_requires=REQUIRES,
     classifiers=[
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3.6',

@@ -39,5 +39,5 @@ class Message(object):
 
 class KafkaMessage(Message):
     def __init__(self, kafka_message, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super(KafkaMessage, self).__init__(*args, **kwargs)
         self.kafka_message = kafka_message
