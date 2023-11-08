@@ -227,6 +227,13 @@ class FeedbackLane(object):
         self.feedback_stream = feedback_stream
 
     def stream(self, from_group, timeout=None):
+        for feedback in self.stream_messages(from_group=from_group, timeout=timeout):
+            if feedback:
+                yield feedback.value
+            else:
+                return
+
+    def stream_messages(self, from_group, timeout=None):
         self.assert_feedback_stream()
 
         log(
@@ -252,9 +259,14 @@ class FeedbackLane(object):
                 yield feedback
 
     def read(self, from_group, timeout=None):
+        message = self.read_message(from_group, timeout=timeout)
+        if message:
+            return message.value
+
+    def read_message(self, from_group, timeout=None):
         self.assert_feedback_stream()
 
-        for feedback in self.stream(from_group=from_group, timeout=timeout):
+        for feedback in self.stream_messages(from_group=from_group, timeout=timeout):
             if feedback.event == Events.FEEDBACK_MESSAGE:
                 return feedback
 
