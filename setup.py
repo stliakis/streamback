@@ -4,7 +4,7 @@ import sys
 with open('README.md', 'r') as fh:
     long_description = fh.read()
 
-if sys.version_info >= (2, 7):
+if sys.version_info >= (2, 7) and sys.version_info < (3,):
     REQUIRES = [
         "redis>=2.10.6", "confluent-kafka==1.7.0"
     ]
@@ -15,7 +15,7 @@ else:
 
 setup(
     name="streamback",
-    version="0.0.24",
+    version="0.0.25",
     author='Stefanos Liakis',
     author_email='stliakis@gmail.com',
     description="2-way streams for your microservices",
