@@ -12,7 +12,8 @@ from streamback import Streamback, KafkaStream, RedisStream
 
 streamback = Streamback(
     "main_app",
-    streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379",
+    log_level="DEBUG"
 )
 
 streamback.send("test_hello", {

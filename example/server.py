@@ -5,9 +5,16 @@ import time
 from streamback.retry_strategy import RetryStrategy
 from streamback import Streamback, KafkaStream, RedisStream, Listener
 
+
+def on_exception(listener, context, message, exception):
+    print("on_exception:", type(exception))
+
+
 streamback = Streamback(
     "main_app",
-    streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379",
+    on_exception=on_exception,
+    log_level="DEBUG"
 )
 
 

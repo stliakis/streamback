@@ -1,7 +1,10 @@
 import inspect
+import logging
 import traceback
-from logging import INFO, ERROR, WARNING
+from logging import INFO, ERROR, WARNING, DEBUG
 import uuid
+
+from .exceptions import CouldNotFlushToMainStream
 from .context import ConsumerContext
 from .events import Events
 from .listener import Listener
@@ -18,10 +21,16 @@ class Streamback(object):
             feedback_stream=None,
             feedback_timeout=60,
             feedback_ttl=300,
+            main_stream_timeout=10,
+            on_exception=None,
+            log_level="INFO"
     ):
+        self.initialize_logger(log_level)
+
         self.name = name
         self.feedback_timeout = feedback_timeout
         self.feedback_ttl = feedback_ttl
+        self.on_exception = on_exception
 
         if streams:
             parsed_streams = ParsedStreams(streams)
@@ -32,7 +41,7 @@ class Streamback(object):
             self.feedback_stream = feedback_stream
 
         if self.main_stream:
-            self.main_stream.initialize(name)
+            self.main_stream.initialize(name, flush_timeout=main_stream_timeout)
 
         if self.feedback_stream:
             self.feedback_stream.initialize(name)
@@ -55,8 +64,28 @@ class Streamback(object):
             ),
         )
 
+    def initialize_logger(self, log_level):
+        logger = logging.getLogger("streamback")
+        logger.setLevel({
+                            "INFO": logging.INFO,
+                            "ERROR": logging.ERROR,
+                            "DEBUG": logging.DEBUG,
+                            "WARNING": logging.WARNING,
+                        }.get(log_level.upper(), logging.INFO))
+
+        console_handler = logging.StreamHandler()
+        formatter = logging.Formatter('streamback - %(levelname)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+
     def get_payload_metadata(self):
         return {"source_group": self.name}
+
+    def flush(self):
+        if self.main_stream:
+            self.main_stream.flush()
+        if self.feedback_stream:
+            self.feedback_stream.flush()
 
     def send(
             self,
@@ -65,7 +94,7 @@ class Streamback(object):
             payload=None,
             key=None,
             event=Events.MAIN_STREAM_MESSAGE,
-            flush=True,
+            flush=False,
     ):
         payload = payload or {}
 
@@ -84,7 +113,7 @@ class Streamback(object):
 
         log(
             INFO,
-            "SENDING[topic={topic} key={key} payload={payload}]".format(
+            "DEBUG[topic={topic} key={key} payload={payload}]".format(
                 topic=topic, key=key, payload=payload
             ),
         )
@@ -119,7 +148,7 @@ class Streamback(object):
         payload.update({"event": Events.FEEDBACK_MESSAGE, "source_group": self.name})
 
         log(
-            INFO,
+            DEBUG,
             "SENDING_FEEDBACK[event={event} topic={topic} payload={payload}]".format(
                 topic=topic, event=Events.FEEDBACK_MESSAGE, payload=payload
             ),
@@ -133,7 +162,7 @@ class Streamback(object):
         payload.update(self.get_payload_metadata())
 
         log(
-            INFO,
+            DEBUG,
             "SENDING_FEEDBACK[event={event} topic={topic} payload={payload}]".format(
                 topic=topic,
                 event=Events.FEEDBACK_END,
@@ -147,10 +176,7 @@ class Streamback(object):
         def decorator(func):
             if inspect.isclass(func) and issubclass(func, Listener):
                 listener_class = func
-                listener = listener_class(
-                    topic=topic,
-                    retry_strategy=retry
-                )
+                listener = listener_class(topic=topic, retry_strategy=retry)
                 self.add_listener(listener)
             else:
                 if not topic:
@@ -158,11 +184,7 @@ class Streamback(object):
                         "topic is required when using a function as a listener"
                     )
                 self.add_listener(
-                    Listener(
-                        topic=topic,
-                        function=func,
-                        retry_strategy=retry
-                    )
+                    Listener(topic=topic, function=func, retry_strategy=retry)
                 )
 
             def wrapper_func(*args, **kwargs):
@@ -183,7 +205,7 @@ class Streamback(object):
                 streamback=self, topics=topics, timeout=None
         ):
             log(
-                INFO,
+                DEBUG,
                 "RECEIVED[message={message}]".format(message=message),
             )
 
@@ -210,11 +232,12 @@ class Streamback(object):
                 for failed_listener in failed_listeners:
                     self.on_consume_error(*failed_listener)
             elif not failed_listeners:
-                if message.feedback_topic:
+                if self.feedback_stream and message.feedback_topic:
                     self.send_feedback_end(message.feedback_topic)
 
     def on_consume_error(self, listener, exception, context, message):
-        pass
+        if self.on_exception:
+            self.on_exception(listener, context, message, exception)
 
     def add_listener(self, listener):
         self.listeners.setdefault(listener.topic, []).append(listener)
@@ -243,6 +266,10 @@ class FeedbackLane(object):
             ),
         )
 
+        flushed = self.streamback.main_stream.flush()
+        if not flushed:
+            raise CouldNotFlushToMainStream("Could not flush to main stream, feedback will not be received")
+
         for feedback in self.feedback_stream.read_stream(
                 streamback=self,
                 topics=[self.feedback_topic],
@@ -251,7 +278,7 @@ class FeedbackLane(object):
             if from_group and feedback.source_group != from_group:
                 continue
 
-            log(INFO, "RECEIVED_FEEDBACK[{feedback}]".format(feedback=feedback))
+            log(DEBUG, "RECEIVED_FEEDBACK[{feedback}]".format(feedback=feedback))
 
             if feedback.event == Events.FEEDBACK_END:
                 return
@@ -265,10 +292,12 @@ class FeedbackLane(object):
 
     def read_message(self, from_group, timeout=None):
         self.assert_feedback_stream()
-
         for feedback in self.stream_messages(from_group=from_group, timeout=timeout):
             if feedback.event == Events.FEEDBACK_MESSAGE:
                 return feedback
+
+    def flush(self):
+        self.streamback.main_stream.flush()
 
     def assert_feedback_stream(self):
         if not self.feedback_stream:

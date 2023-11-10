@@ -48,8 +48,7 @@ from streamback import Streamback, KafkaStream, RedisStream
 
 streamback = Streamback(
     "example_consumer_app",
-    main_stream=KafkaStream("kafka:9092"),
-    feedback_stream=RedisStream("redis:6379"),
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
 
@@ -68,8 +67,7 @@ from streamback import Streamback, KafkaStream, RedisStream
 
 streamback = Streamback(
     "example_producer_app",
-    main_stream=KafkaStream("kafka:9092"),
-    feedback_stream=RedisStream("redis:6379"),
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
 streamback.send("test_hello", "Hello world!")
@@ -86,8 +84,7 @@ from streamback import Streamback, KafkaStream, RedisStream
 
 streamback = Streamback(
     "example_consumer_app",
-    main_stream=KafkaStream("kafka:9092"),
-    feedback_stream=RedisStream("redis:6379"),
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
 
@@ -107,11 +104,10 @@ from streamback import Streamback, KafkaStream, RedisStream
 
 streamback = Streamback(
     "example_producer_app",
-    main_stream=KafkaStream("kafka:9092"),
-    feedback_stream=RedisStream("redis:6379"),
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
-message = Streamback.send("test_hello_stream", "Hello world!").read(timeout=10)
+message = streamback.send("test_hello_stream", "Hello world!").read(timeout=10)
 print(message)
 ```
 
@@ -127,8 +123,7 @@ import time
 
 streamback = Streamback(
     "example_consumer_app",
-    main_stream=KafkaStream("kafka:9092"),
-    feedback_stream=RedisStream("redis:6379"),
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
 
@@ -150,16 +145,15 @@ from streamback import Streamback, KafkaStream, RedisStream
 
 streamback = Streamback(
     "example_producer_app",
-    main_stream=KafkaStream("kafka:9092"),
-    feedback_stream=RedisStream("redis:6379"),
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
-for message in Streamback.send("test_hello_stream", "Hello world!").stream():
+for message in streamback.send("test_hello_stream", "Hello world!").stream():
     print(message)
 
 ## OR
 
-stream = Streamback.send("test_hello_stream", "Hello world!")
+stream = streamback.send("test_hello_stream", "Hello world!")
 
 message1 = stream.read()
 message2 = stream.read()
@@ -211,8 +205,7 @@ from some_consumers import router as some_consumers_router
 
 streamback = Streamback(
     "example_consumer_app",
-    main_stream=KafkaStream("kafka:9092"),
-    feedback_stream=RedisStream("redis:6379"),
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
 streamback.include_router(some_consumers_router)
@@ -220,18 +213,21 @@ streamback.include_router(some_consumers_router)
 streamback.start()
 ```
 
-## Streams connection string
-You can use the following format for the main and feedback streams for a more compact way of defining the streams
+## Handling consume exceptions
+You can pass the on_exception callback upon creating the Streamback object to handle exceptions that occur during the consumption of messages by the listeners
 
 ```python
 
 from streamback import Streamback
 
+def on_exception(listener, context, message, exception):
+    print("on_exception:", listener, context, message, exception)
+
 streamback = Streamback(
     "example_consumer_app",
-    streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379",
+    on_exception=on_exception
 )
-
 ```
 
 ### Why python 2.7 compatible?

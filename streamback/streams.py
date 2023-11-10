@@ -9,7 +9,7 @@ from .utils import log, listify
 
 
 class Stream(object):
-    def initialize(self, group_name):
+    def initialize(self, group_name, timeout=10):
         raise NotImplementedError
 
     def send(self, topic, payload, key=None, flush=False):
@@ -24,22 +24,26 @@ class Stream(object):
     def deserialize_payload(self, data):
         return json.loads(data.decode("utf-8"))
 
+    def flush(self):
+        raise NotImplementedError
+
 
 class KafkaStream(Stream):
     def __init__(self, kafka_host):
         self.kafka_hosts = listify(kafka_host)
 
-    def initialize(self, group_name):
+    def initialize(self, group_name, flush_timeout=10):
         self.group_name = group_name
         self.kafka_producer = self.create_kafka_producer()
         self.kafka_consumer = self.create_kafka_consumer()
+        self.flush_timeout = flush_timeout
 
     def create_kafka_producer(self):
         return Producer(
             {
                 "bootstrap.servers": ",".join(self.kafka_hosts),
-                "linger.ms": 0,
-                "batch.size": 10,
+                "linger.ms": 500,
+                "batch.size": 8192,
                 "acks": 1,
             }
         )
@@ -58,7 +62,19 @@ class KafkaStream(Stream):
     def send(self, topic, payload, key=None, flush=False):
         self.kafka_producer.produce(topic, self.serialize_payload(payload), key=key)
         if flush:
-            self.kafka_producer.flush()
+            self.flush()
+
+    def flush(self):
+        self.kafka_producer.poll(0)
+        remaining_messages = self.kafka_producer.flush(timeout=self.flush_timeout)
+        if remaining_messages:
+            log(INFO, "FAILED_TO_FLUSH_MESSAGES[REMAINING={remaining_messages}]".format(
+                remaining_messages=remaining_messages))
+            return False
+        else:
+            log(INFO, "SUCCESSFULLY_FLUSHED_MESSAGES")
+
+        return True
 
     def read_stream(self, streamback, topics, timeout=None):
         consumer = self.create_kafka_consumer()
@@ -111,8 +127,9 @@ class RedisStream(Stream):
     def __init__(self, redis_host):
         self.redis_host = redis_host
 
-    def initialize(self, group_name):
+    def initialize(self, group_name, flush_timeout=10):
         self.group_name = group_name
+        self.flush_timeout = flush_timeout
         self.redis_client = redis.Redis(
             host=self.redis_host.split(":")[0],
             port=int(self.redis_host.split(":")[1]),
@@ -143,6 +160,8 @@ class RedisStream(Stream):
 
             yield message
 
+    def flush(self):
+        pass
 
 
 class ParsedStreams(object):
