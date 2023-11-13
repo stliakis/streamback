@@ -42,9 +42,10 @@ class KafkaStream(Stream):
         return Producer(
             {
                 "bootstrap.servers": ",".join(self.kafka_hosts),
-                "linger.ms": 500,
-                "batch.size": 8192,
+                "linger.ms": 1000,
+                "batch.size": 32768,
                 "acks": 1,
+                "queue.buffering.max.messages": 200000
             }
         )
 
@@ -53,6 +54,7 @@ class KafkaStream(Stream):
             {
                 "bootstrap.servers": ",".join(self.kafka_hosts),
                 "group.id": self.group_name,
+                "queue.buffering.max.messages": 200000,
                 "auto.offset.reset": "earliest",
                 "fetch.min.bytes": 1,
                 "enable.auto.commit": False
