@@ -13,13 +13,9 @@ stream Kafka is intended to be used as.
 ----
 Streamback implements two different streams, the main stream and the feedback stream.
 
-- **Main stream**: This is the stream that the producer sends messages to the consumer, it can be Kafka or Redis(or you
-  can
-  implement your own stream)
-- **Feedback stream**: This is the stream the the consumer sends messages to the producer, Kafka is not recommended for
-  this
-  cause each time a new consumer is added to the cluster it causes a rebalance. Redis is the recommended stream for
-  this.
+- **Main stream**: This is the kafka stream that the producer sends messages to the consumer.
+- **Feedback stream**: This is the stream that the consumer sends messages to the producer. Redis is used for this stream for its
+- simplicity and speed.
 
 ### Why not just use the conventional one way streams?
 
@@ -44,7 +40,7 @@ pip install streamback
 #### Consumer
 
 ```python
-from streamback import Streamback, KafkaStream, RedisStream
+from streamback import Streamback
 
 streamback = Streamback(
     "example_consumer_app",
@@ -63,7 +59,7 @@ streamback.start()
 #### Producer
 
 ```python
-from streamback import Streamback, KafkaStream, RedisStream
+from streamback import Streamback
 
 streamback = Streamback(
     "example_producer_app",
@@ -80,7 +76,7 @@ streamback.send("test_hello", "Hello world!")
 #### Consumer
 
 ```python
-from streamback import Streamback, KafkaStream, RedisStream
+from streamback import Streamback
 
 streamback = Streamback(
     "example_consumer_app",
@@ -100,7 +96,7 @@ streamback.start()
 #### Producer
 
 ```python
-from streamback import Streamback, KafkaStream, RedisStream
+from streamback import Streamback
 
 streamback = Streamback(
     "example_producer_app",
@@ -141,7 +137,7 @@ streamback.start()
 #### Producer
 
 ```python
-from streamback import Streamback, KafkaStream, RedisStream
+from streamback import Streamback
 
 streamback = Streamback(
     "example_producer_app",
@@ -199,7 +195,7 @@ def test_hello(context, message):
 #### my_consumer_app.py
 
 ```python
-from streamback import Streamback, KafkaStream, RedisStream
+from streamback import Streamback
 
 from some_consumers import router as some_consumers_router
 

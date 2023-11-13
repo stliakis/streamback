@@ -22,6 +22,7 @@ class Streamback(object):
             feedback_timeout=60,
             feedback_ttl=300,
             main_stream_timeout=10,
+            auto_flush_messages_count=None,
             on_exception=None,
             log_level="INFO"
     ):
@@ -41,7 +42,9 @@ class Streamback(object):
             self.feedback_stream = feedback_stream
 
         if self.main_stream:
-            self.main_stream.initialize(name, flush_timeout=main_stream_timeout)
+            self.main_stream.initialize(name,
+                                        flush_timeout=main_stream_timeout,
+                                        auto_flush_messages_count=auto_flush_messages_count)
 
         if self.feedback_stream:
             self.feedback_stream.initialize(name)

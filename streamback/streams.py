@@ -32,20 +32,21 @@ class KafkaStream(Stream):
     def __init__(self, kafka_host):
         self.kafka_hosts = listify(kafka_host)
 
-    def initialize(self, group_name, flush_timeout=10):
+    def initialize(self, group_name, flush_timeout=10, auto_flush_messages_count=None):
         self.group_name = group_name
         self.kafka_producer = self.create_kafka_producer()
         self.kafka_consumer = self.create_kafka_consumer()
         self.flush_timeout = flush_timeout
+        self.auto_flush_messages_count = auto_flush_messages_count
+        self.messages_since_last_flush = 0
 
     def create_kafka_producer(self):
         return Producer(
             {
                 "bootstrap.servers": ",".join(self.kafka_hosts),
-                "linger.ms": 1000,
-                "batch.size": 32768,
+                "batch.size": 4096,
                 "acks": 1,
-                "queue.buffering.max.messages": 200000
+                "queue.buffering.max.messages": 50000
             }
         )
 
@@ -63,11 +64,14 @@ class KafkaStream(Stream):
 
     def send(self, topic, payload, key=None, flush=False):
         self.kafka_producer.produce(topic, self.serialize_payload(payload), key=key)
+        self.messages_since_last_flush += 1
+
         if flush:
+            self.flush()
+        elif self.auto_flush_messages_count and self.messages_since_last_flush >= self.auto_flush_messages_count:
             self.flush()
 
     def flush(self):
-        self.kafka_producer.poll(0)
         remaining_messages = self.kafka_producer.flush(timeout=self.flush_timeout)
         if remaining_messages:
             log(INFO, "FAILED_TO_FLUSH_MESSAGES[REMAINING={remaining_messages}]".format(
@@ -75,6 +79,8 @@ class KafkaStream(Stream):
             return False
         else:
             log(INFO, "SUCCESSFULLY_FLUSHED_MESSAGES")
+
+        self.messages_since_last_flush = 0
 
         return True
 
@@ -129,7 +135,7 @@ class RedisStream(Stream):
     def __init__(self, redis_host):
         self.redis_host = redis_host
 
-    def initialize(self, group_name, flush_timeout=10):
+    def initialize(self, group_name, flush_timeout=10, auto_flush_messages_count=None):
         self.group_name = group_name
         self.flush_timeout = flush_timeout
         self.redis_client = redis.Redis(
