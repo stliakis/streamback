@@ -22,7 +22,7 @@ class Streamback(object):
             feedback_timeout=60,
             feedback_ttl=300,
             main_stream_timeout=10,
-            auto_flush_messages_count=None,
+            auto_flush_messages_count=50,
             on_exception=None,
             log_level="INFO"
     ):
