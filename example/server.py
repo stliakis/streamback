@@ -34,6 +34,8 @@ def test_hello(context, message):
         "message": "hello back"
     })
 
+    # raise Exception()
+
 
 @streamback.listen("new_log")
 class LogsConsumer(Listener):

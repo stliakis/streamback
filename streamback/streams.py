@@ -97,7 +97,7 @@ class KafkaStream(Stream):
         )
 
         while True:
-            msg = consumer.poll(1)
+            msg = consumer.poll(0.1)
 
             if timeout:
                 time_since_begin = time.time() - begin
