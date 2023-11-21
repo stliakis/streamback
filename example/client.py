@@ -16,9 +16,9 @@ streamback = Streamback(
     log_level="DEBUG"
 )
 
-streamback.send("test_hello", {
+value = streamback.send("test_hello", {
     "message": "hello"
-}).flush()
+}).read("main_app")
 
 # response = streamback.send("test_streaming", {
 #     "message": "hello there"

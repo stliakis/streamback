@@ -29,12 +29,12 @@ def test_streaming(context, message):
 
 @streamback.listen("test_hello", retry=RetryStrategy(retry_times=3))
 def test_hello(context, message):
-    print("received: {value}".format(value=message.value))
-    message.respond({
-        "message": "hello back"
-    })
+    # print("received: {value}".format(value=message.value))
+    # message.respond({
+    #     "message": "hello back"
+    # })
 
-    raise Exception()
+    a = 1 / 0
 
 
 @streamback.listen("new_log")

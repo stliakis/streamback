@@ -55,7 +55,6 @@ class KafkaStream(Stream):
             {
                 "bootstrap.servers": ",".join(self.kafka_hosts),
                 "group.id": self.group_name,
-                "queue.buffering.max.messages": 200000,
                 "auto.offset.reset": "earliest",
                 "fetch.min.bytes": 1,
                 "enable.auto.commit": False

@@ -27,3 +27,8 @@ class CouldNotFlushToMainStream(Exception):
 
     def __str__(self):
         return "CouldNotFlushToMainStream[message=%s]" % self.message
+
+
+class FeedbackError(Exception):
+    def __init__(self, message):
+        self.message = message

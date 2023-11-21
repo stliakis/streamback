@@ -22,6 +22,10 @@ class Message(object):
         return self.payload.get("value")
 
     @property
+    def error(self):
+        return self.payload.get("error")
+
+    @property
     def feedback_topic(self):
         return self.payload.get("feedback_topic")
 

@@ -4,7 +4,7 @@ import traceback
 from logging import INFO, ERROR, WARNING, DEBUG
 import uuid
 
-from .exceptions import CouldNotFlushToMainStream
+from .exceptions import CouldNotFlushToMainStream, FeedbackError
 from .context import ConsumerContext
 from .events import Events
 from .listener import Listener
@@ -170,8 +170,13 @@ class Streamback(object):
 
         self.feedback_stream.send(topic, payload)
 
-    def send_feedback_end(self, topic):
-        payload = {"event": Events.FEEDBACK_END}
+    def send_feedback_end(self, topic, with_error=None):
+        if with_error is not None:
+            event = Events.FEEDBACK_END_WITH_ERROR
+        else:
+            event = Events.FEEDBACK_END
+
+        payload = {"event": event, "error": with_error}
 
         payload.update(self.get_payload_metadata())
 
@@ -179,7 +184,7 @@ class Streamback(object):
             DEBUG,
             "SENDING_FEEDBACK[event={event} topic={topic} payload={payload}]".format(
                 topic=topic,
-                event=Events.FEEDBACK_END,
+                event=event,
                 payload=payload,
             ),
         )
@@ -243,8 +248,13 @@ class Streamback(object):
                     message.ack()
 
             if failed_listeners:
+                errors = []
                 for failed_listener in failed_listeners:
                     self.on_consume_error(*failed_listener)
+                    errors.append(repr(failed_listener[1]))
+
+                if self.feedback_stream and message.feedback_topic:
+                    self.send_feedback_end(message.feedback_topic, with_error=", ".join(errors))
             elif not failed_listeners:
                 if self.feedback_stream and message.feedback_topic:
                     self.send_feedback_end(message.feedback_topic)
@@ -297,6 +307,8 @@ class FeedbackLane(object):
 
             if feedback.event == Events.FEEDBACK_END:
                 return
+            elif feedback.event == Events.FEEDBACK_END_WITH_ERROR:
+                raise FeedbackError(feedback.error)
             else:
                 yield feedback
 
