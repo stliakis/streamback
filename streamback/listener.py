@@ -46,6 +46,8 @@ class Listener(object):
                                                                                                        retry_times=retry_times),
                     )
                     self.try_to_consume(context, message, retry_times=retry_times + 1)
+            else:
+                raise e
 
     def consume(self, context, message):
         if self.function:

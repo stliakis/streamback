@@ -176,24 +176,29 @@ class ParsedStreams(object):
     def __init__(self, streams_string):
         self.main_stream = None
         self.feedback_stream = None
+        self.topics_prefix = None
 
         streams = streams_string.split("&")
         for stream in streams:
-            stream_category = stream.split("=")[0]
-            stream_value = stream.split("=")[1]
-            stream_type = stream_value.split("://")[0]
-            stream_hosts = stream_value.split("://")[1]
-            if stream_type == "kafka":
-                stream = KafkaStream(stream_hosts)
-            elif stream_type == "redis":
-                stream = RedisStream(stream_hosts)
-            else:
-                raise Exception("Unknown stream type: %s" % stream_type)
+            setting_name = stream.split("=")[0]
+            setting_value = stream.split("=")[1]
 
-            if stream_category == "main":
-                self.main_stream = stream
-            elif stream_category == "feedback":
-                self.feedback_stream = stream
+            if setting_name in ["main", "feedback"]:
+                protocol = setting_value.split("://")[0]
+                value = setting_value.split("://")[1]
+                if protocol == "kafka":
+                    stream = KafkaStream(value)
+                elif protocol == "redis":
+                    stream = RedisStream(value)
+
+                if setting_name == "main":
+                    self.main_stream = stream
+                elif setting_name == "feedback":
+                    self.feedback_stream = stream
+            elif setting_name == "topics_prefix":
+                self.topics_prefix = setting_value
+            else:
+                raise Exception("Unknown setting: %s" % setting_name)
 
         if not self.main_stream:
             raise InvalidSteamsString(streams_string, "Main stream is required")

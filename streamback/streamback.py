@@ -17,6 +17,7 @@ class Streamback(object):
             self,
             name,
             streams=None,
+            topics_prefix=None,
             main_stream=None,
             feedback_stream=None,
             feedback_timeout=60,
@@ -32,11 +33,13 @@ class Streamback(object):
         self.feedback_timeout = feedback_timeout
         self.feedback_ttl = feedback_ttl
         self.on_exception = on_exception
+        self.topics_prefix = topics_prefix
 
         if streams:
             parsed_streams = ParsedStreams(streams)
             self.main_stream = parsed_streams.main_stream
             self.feedback_stream = parsed_streams.feedback_stream
+            self.topics_prefix = parsed_streams.topics_prefix
         else:
             self.main_stream = main_stream
             self.feedback_stream = feedback_stream
@@ -90,6 +93,12 @@ class Streamback(object):
         if self.feedback_stream:
             self.feedback_stream.flush()
 
+    def get_topic_real_name(self, topic):
+        if self.topics_prefix:
+            return "%s.%s" % (self.topics_prefix, topic)
+
+        return topic
+
     def send(
             self,
             topic,
@@ -99,6 +108,8 @@ class Streamback(object):
             event=Events.MAIN_STREAM_MESSAGE,
             flush=False,
     ):
+        topic = self.get_topic_real_name(topic)
+
         payload = payload or {}
 
         correlation_id = str(uuid.uuid4())
@@ -243,6 +254,7 @@ class Streamback(object):
             self.on_exception(listener, context, message, exception)
 
     def add_listener(self, listener):
+        listener.topic = self.get_topic_real_name(listener.topic)
         self.listeners.setdefault(listener.topic, []).append(listener)
 
 

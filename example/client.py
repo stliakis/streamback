@@ -12,13 +12,13 @@ from streamback import Streamback, KafkaStream, RedisStream
 
 streamback = Streamback(
     "main_app",
-    streams="main=kafka://kafka:9092&feedback=redis://redis:6379",
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379&topics_prefix=stefanos-dev-topics",
     log_level="DEBUG"
 )
 
 streamback.send("test_hello", {
     "message": "hello"
-})
+}).flush()
 
 # response = streamback.send("test_streaming", {
 #     "message": "hello there"

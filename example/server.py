@@ -12,7 +12,7 @@ def on_exception(listener, context, message, exception):
 
 streamback = Streamback(
     "main_app",
-    streams="main=kafka://kafka:9092&feedback=redis://redis:6379",
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379&topics_prefix=stefanos-dev-topics",
     on_exception=on_exception,
     log_level="DEBUG"
 )
@@ -34,7 +34,7 @@ def test_hello(context, message):
         "message": "hello back"
     })
 
-    # raise Exception()
+    raise Exception()
 
 
 @streamback.listen("new_log")
