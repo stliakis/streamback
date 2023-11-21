@@ -94,7 +94,7 @@ class Streamback(object):
             self.feedback_stream.flush()
 
     def get_topic_real_name(self, topic):
-        if self.topics_prefix:
+        if self.topics_prefix and not topic.startswith(self.topics_prefix):
             return "%s.%s" % (self.topics_prefix, topic)
 
         return topic
