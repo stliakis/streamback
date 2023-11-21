@@ -1,5 +1,5 @@
 import json
-from logging import INFO, ERROR
+from logging import INFO, ERROR, WARNING
 import redis
 import time
 from confluent_kafka import Producer, Consumer, KafkaError, KafkaException, TopicPartition
@@ -198,7 +198,7 @@ class ParsedStreams(object):
             elif setting_name == "topics_prefix":
                 self.topics_prefix = setting_value
             else:
-                raise Exception("Unknown setting: %s" % setting_name)
+                log(WARNING, "Unknown setting: %s" % setting_name)
 
         if not self.main_stream:
             raise InvalidSteamsString(streams_string, "Main stream is required")
