@@ -1,5 +1,5 @@
 import json
-from logging import INFO, ERROR, WARNING
+from logging import INFO, ERROR, WARNING, DEBUG
 import redis
 import time
 from confluent_kafka import Producer, Consumer, KafkaError, KafkaException, TopicPartition
@@ -27,26 +27,29 @@ class Stream(object):
     def flush(self):
         raise NotImplementedError
 
+    def get_pending_messages_count(self):
+        return 0
+
 
 class KafkaStream(Stream):
     def __init__(self, kafka_host):
         self.kafka_hosts = listify(kafka_host)
 
-    def initialize(self, group_name, flush_timeout=10, auto_flush_messages_count=None):
+    def initialize(self, group_name, flush_timeout=None, auto_flush_messages_count=None):
         self.group_name = group_name
         self.kafka_producer = self.create_kafka_producer()
         self.kafka_consumer = self.create_kafka_consumer()
         self.flush_timeout = flush_timeout
         self.auto_flush_messages_count = auto_flush_messages_count
-        self.messages_since_last_flush = 0
 
     def create_kafka_producer(self):
         return Producer(
             {
                 "bootstrap.servers": ",".join(self.kafka_hosts),
-                "batch.size": 4096,
+                "batch.size": 32768,
+                "linger.ms": 1,
                 "acks": 1,
-                "queue.buffering.max.messages": 50000
+                "queue.buffering.max.messages": 100000
             }
         )
 
@@ -63,23 +66,29 @@ class KafkaStream(Stream):
 
     def send(self, topic, payload, key=None, flush=False):
         self.kafka_producer.produce(topic, self.serialize_payload(payload), key=key)
-        self.messages_since_last_flush += 1
+        self.kafka_producer.poll(0)
+
+        queue_size = self.get_pending_messages_count()
+
+        log(DEBUG, "KAFKA_BUFFER_SIZE[SIZE={remaining_messages}]".format(
+            remaining_messages=queue_size))
 
         if flush:
             self.flush()
-        elif self.auto_flush_messages_count and self.messages_since_last_flush >= self.auto_flush_messages_count:
+        elif self.auto_flush_messages_count and queue_size >= self.auto_flush_messages_count:
             self.flush()
 
+    def get_pending_messages_count(self):
+        return len(self.kafka_producer)
+
     def flush(self):
-        remaining_messages = self.kafka_producer.flush(timeout=self.flush_timeout)
+        remaining_messages = self.kafka_producer.flush(timeout=self.flush_timeout or 5)
         if remaining_messages:
-            log(INFO, "FAILED_TO_FLUSH_MESSAGES[REMAINING={remaining_messages}]".format(
+            log(ERROR, "FAILED_TO_FLUSH_MESSAGES[REMAINING={remaining_messages}]".format(
                 remaining_messages=remaining_messages))
             return False
         else:
             log(INFO, "SUCCESSFULLY_FLUSHED_MESSAGES")
-
-        self.messages_since_last_flush = 0
 
         return True
 
@@ -134,7 +143,7 @@ class RedisStream(Stream):
     def __init__(self, redis_host):
         self.redis_host = redis_host
 
-    def initialize(self, group_name, flush_timeout=10, auto_flush_messages_count=None):
+    def initialize(self, group_name, flush_timeout=5, auto_flush_messages_count=None):
         self.group_name = group_name
         self.flush_timeout = flush_timeout
         self.redis_client = redis.Redis(
@@ -146,6 +155,9 @@ class RedisStream(Stream):
     def send(self, topic, payload, key=None, flush=None):
         self.redis_client.lpush(topic, self.serialize_payload(payload))
         self.redis_client.expire(topic, 300)
+
+    def get_pending_messages_count(self):
+        return 0
 
     def read_stream(self, streamback, topics, timeout=None):
         while True:

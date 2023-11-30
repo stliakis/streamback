@@ -1,5 +1,6 @@
 import inspect
 import logging
+import time
 import traceback
 from logging import INFO, ERROR, WARNING, DEBUG
 import uuid
@@ -22,8 +23,8 @@ class Streamback(object):
             feedback_stream=None,
             feedback_timeout=60,
             feedback_ttl=300,
-            main_stream_timeout=10,
-            auto_flush_messages_count=50,
+            main_stream_timeout=5,
+            auto_flush_messages_count=200,
             on_exception=None,
             log_level="INFO"
     ):
@@ -88,10 +89,13 @@ class Streamback(object):
         return {"source_group": self.name}
 
     def flush(self):
-        if self.main_stream:
-            self.main_stream.flush()
         if self.feedback_stream:
             self.feedback_stream.flush()
+
+        if self.main_stream:
+            return self.main_stream.flush()
+
+        return 0
 
     def get_topic_real_name(self, topic):
         if self.topics_prefix and not topic.startswith(self.topics_prefix):
@@ -125,14 +129,18 @@ class Streamback(object):
 
         payload.update(self.get_payload_metadata())
 
-        log(
-            INFO,
-            "DEBUG[topic={topic} key={key} payload={payload}]".format(
-                topic=topic, key=key, payload=payload
-            ),
-        )
+        begin = time.time()
 
         self.main_stream.send(topic, payload, key=key, flush=flush)
+
+        took = (time.time() - begin) * 1000
+
+        log(
+            INFO,
+            "DEBUG[topic={topic}, key={key}, payload={payload}, took_ms={took}]".format(
+                topic=topic, key=key, payload="{...}", took=round(took, 2)
+            ),
+        )
 
         return FeedbackLane(
             streamback=self,
