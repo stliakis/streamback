@@ -26,10 +26,13 @@ class Streamback(object):
             main_stream_timeout=5,
             auto_flush_messages_count=200,
             on_exception=None,
-            log_level="INFO"
+            callbacks=None,
+            log_level="INFO",
+            **kwargs
     ):
         self.initialize_logger(log_level)
 
+        self.callbacks = callbacks or []
         self.name = name
         self.feedback_timeout = feedback_timeout
         self.feedback_ttl = feedback_ttl
@@ -199,11 +202,11 @@ class Streamback(object):
 
         self.feedback_stream.send(topic, payload)
 
-    def listen(self, topic=None, retry=None):
+    def listen(self, topic=None, retry=None, input=None):
         def decorator(func):
             if inspect.isclass(func) and issubclass(func, Listener):
                 listener_class = func
-                listener = listener_class(topic=topic, retry_strategy=retry)
+                listener = listener_class(topic=topic, retry_strategy=retry, input=input)
                 self.add_listener(listener)
             else:
                 if not topic:
@@ -211,7 +214,7 @@ class Streamback(object):
                         "topic is required when using a function as a listener"
                     )
                 self.add_listener(
-                    Listener(topic=topic, function=func, retry_strategy=retry)
+                    Listener(topic=topic, function=func, retry_strategy=retry, input=input)
                 )
 
             def wrapper_func(*args, **kwargs):
@@ -242,7 +245,11 @@ class Streamback(object):
             failed_listeners = []
             for listener in listeners:
                 try:
+                    for callback in self.get_callbacks():
+                        callback.on_consume_begin(self, listener, context, message)
                     listener.try_to_consume(context, message)
+                    for callback in self.get_callbacks():
+                        callback.on_consume_end(self, listener, context, message)
                 except Exception as e:
                     log(
                         ERROR,
@@ -252,13 +259,16 @@ class Streamback(object):
                     )
                     traceback.print_exc()
                     failed_listeners.append([listener, e, context, message])
+                    for callback in self.get_callbacks():
+                        callback.on_consume_end(self, listener, context, message, exception=e)
                 finally:
+
                     message.ack()
 
             if failed_listeners:
                 errors = []
                 for failed_listener in failed_listeners:
-                    self.on_consume_error(*failed_listener)
+                    self.consume_exception(*failed_listener)
                     errors.append(repr(failed_listener[1]))
 
                 if self.feedback_stream and message.feedback_topic:
@@ -267,13 +277,23 @@ class Streamback(object):
                 if self.feedback_stream and message.feedback_topic:
                     self.send_feedback_end(message.feedback_topic)
 
-    def on_consume_error(self, listener, exception, context, message):
+    def get_callbacks(self):
+        return self.callbacks
+
+    def consume_exception(self, listener, exception, context, message):
         if self.on_exception:
             self.on_exception(listener, context, message, exception)
+        for callback in self.get_callbacks():
+            callback.on_consume_exception(self, listener, exception, context, message)
 
     def add_listener(self, listener):
         listener.topic = self.get_topic_real_name(listener.topic)
         self.listeners.setdefault(listener.topic, []).append(listener)
+        return self
+
+    def add_callback(self, callback):
+        self.callbacks.append(callback)
+        return self
 
 
 class FeedbackLane(object):

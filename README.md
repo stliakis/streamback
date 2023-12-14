@@ -66,7 +66,7 @@ streamback = Streamback(
     streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
-streamback.send("test_hello", "Hello world!")
+streamback.send("test_hello", {"something":"Hello world!"})
 ```
 
 ----
@@ -103,7 +103,7 @@ streamback = Streamback(
     streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
-message = streamback.send("test_hello_stream", "Hello world!").read(timeout=10)
+message = streamback.send("test_hello_stream", {"something":"Hello world!"}).read(timeout=10)
 print(message)
 ```
 
@@ -144,12 +144,12 @@ streamback = Streamback(
     streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
-for message in streamback.send("test_hello_stream", "Hello world!").stream():
+for message in streamback.send("test_hello_stream", {"something":"Hello world!"}).stream():
     print(message)
 
 ## OR
 
-stream = streamback.send("test_hello_stream", "Hello world!")
+stream = streamback.send("test_hello_stream", {"something":"Hello world!"})
 
 message1 = stream.read()
 message2 = stream.read()
@@ -157,6 +157,20 @@ message3 = stream.read()
 ```
 
 ----
+
+## Input injection
+
+Instead of having to deconstruct the message.value inside the consumer's logic, you can pass
+to the consumer only the arguments of the message.value that you want to use.
+
+
+```python
+@streamback.listen("test_input", input = ["arg1", "arg2"])
+def test_input(arg1, arg2):
+    pass
+
+streamback.send("test_input", {"arg1":"Hello world!", "arg2": "Hello world!"})
+```
 
 ### Class based consumers
 
@@ -225,6 +239,21 @@ streamback = Streamback(
     on_exception=on_exception
 )
 ```
+
+```python
+
+from streamback import Streamback
+
+def on_exception(listener, context, message, exception):
+    print("on_exception:", listener, context, message, exception)
+
+streamback = Streamback(
+    "example_consumer_app",
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379",
+    on_exception=on_exception
+)
+```
+
 
 ### Why python 2.7 compatible?
 

@@ -8,16 +8,21 @@ from .retry_strategy import RetryStrategy
 class Listener(object):
     topic = None
     function = None
+    input = None
     retry_strategy = RetryStrategy()
 
-    def __init__(self, topic=None, function=None, retry_strategy=None):
+    def __init__(self, topic=None, function=None, retry_strategy=None, input=None):
         self.topic = topic or self.topic
+        self.input = input or self.input
         self.function = function or self.function
         self.retry_strategy = retry_strategy or self.retry_strategy
 
     def try_to_consume(self, context, message, retry_times=0):
         try:
-            self.consume(context, message)
+            if self.input:
+                self.consume_input(**{key: message.value.get(key) for key in self.input})
+            else:
+                self.consume(context, message)
         except Exception as e:
             log(
                 INFO,
@@ -52,3 +57,7 @@ class Listener(object):
     def consume(self, context, message):
         if self.function:
             self.function(context, message)
+
+    def consume_input(self, *args, **kwargs):
+        if self.function:
+            self.function(*args, **kwargs)

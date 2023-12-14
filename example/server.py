@@ -3,7 +3,7 @@ import sys
 import time
 
 from streamback.retry_strategy import RetryStrategy
-from streamback import Streamback, KafkaStream, RedisStream, Listener
+from streamback import Streamback, KafkaStream, RedisStream, Listener, Callback
 
 
 def on_exception(listener, context, message, exception):
@@ -16,6 +16,25 @@ streamback = Streamback(
     on_exception=on_exception,
     log_level="DEBUG"
 )
+
+
+class StreambackCallbacks(Callback):
+    def on_consume_begin(self, streamback, listener, context, message):
+        print("on_consume_begin:", message)
+
+    def on_consume_end(self, streamback, listener, context, message, exception=None):
+        print("on_consume_end:", message, exception)
+
+    def on_consume_exception(self, streamback, listener, exception, context, message):
+        print("on_consume_exception:", type(exception))
+
+
+streamback.add_callback(StreambackCallbacks())
+
+
+@streamback.listen("test_input", input=["something1", "something2"])
+def test_input(something1, something2):
+    print("test_input:", something1, something2)
 
 
 @streamback.listen("test_streaming")
@@ -33,8 +52,8 @@ def test_hello(context, message):
     # message.respond({
     #     "message": "hello back"
     # })
-
-    a = 1 / 0
+    pass
+    # a = 1 / 0
 
 
 @streamback.listen("new_log")
