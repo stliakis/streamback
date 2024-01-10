@@ -297,4 +297,4 @@ streamback = Streamback(
 
 Streamback has been created for usage in car.gr's systems which has some legacy python 2.7 services. We are are planing
 to move Streamback to python >3.7 in some later version but for now the python 2.7 support was crucial and thus the
-async/await support was sacrificed.
+async/await support was sacrificed. Currently it is used in production to handle millions of messages per day.
