@@ -1,3 +1,4 @@
+import sys
 import time
 from logging import INFO
 
@@ -19,10 +20,12 @@ class Listener(object):
         self.function = function or self.function
         self.retry_strategy = retry_strategy or self.retry_strategy
 
-    def get_listener_function_valid_arguments(self):
-        if self.function:
-            return list(inspect.signature(self.function).parameters.keys())
-        return list(inspect.signature(self.consume).parameters.keys())
+    def get_listener_function_valid_arguments(self, func):
+        if sys.version_info.major == 2:
+            args, varargs, keywords, defaults = inspect.getargspec(func)
+            return args
+        else:
+            return list(inspect.signature(func).parameters.keys())
 
     def try_to_consume(self, context, message, retry_times=0):
         try:
@@ -67,7 +70,7 @@ class Listener(object):
 
     def consume(self, context, message):
         if self.function:
-            valid_arguments = self.get_listener_function_valid_arguments()
+            valid_arguments = self.get_listener_function_valid_arguments(self.function)
 
             args = []
             if "context" in valid_arguments:
