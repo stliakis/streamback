@@ -20,7 +20,9 @@ class Listener(object):
     def try_to_consume(self, context, message, retry_times=0):
         try:
             if self.input:
-                self.consume_input(**{key: message.value.get(key) for key in self.input})
+                self.consume_input(
+                    **{key: message.value.get(key) for key in self.input}
+                )
             else:
                 self.consume(context, message)
         except Exception as e:
@@ -38,8 +40,9 @@ class Listener(object):
                 if retry_times >= self.retry_strategy.retry_times:
                     log(
                         INFO,
-                        "MAX_RETRIES_REACHED[message={message}, retry_times={retry_times}]".format(message=message,
-                                                                                                   retry_times=retry_times),
+                        "MAX_RETRIES_REACHED[message={message}, retry_times={retry_times}]".format(
+                            message=message, retry_times=retry_times
+                        ),
                     )
                     raise e
                 else:
@@ -47,8 +50,9 @@ class Listener(object):
                         time.sleep(self.retry_strategy.retry_interval)
                     log(
                         INFO,
-                        "RETRYING_FAILED_MESSAGE[message={message}, retry_times={retry_times}]".format(message=message,
-                                                                                                       retry_times=retry_times),
+                        "RETRYING_FAILED_MESSAGE[message={message}, retry_times={retry_times}]".format(
+                            message=message, retry_times=retry_times
+                        ),
                     )
                     self.try_to_consume(context, message, retry_times=retry_times + 1)
             else:

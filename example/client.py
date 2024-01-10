@@ -18,9 +18,11 @@ streamback = Streamback(
     log_level="DEBUG"
 )
 
-d = {
-    "kSAD ASD ASDA SDSAD-%s" % i: "vAS DASD ASD ASD -%s" % i for i in range(10)
-}
+
+#
+# d = {
+#     "kSAD ASD ASDA SDSAD-%s" % i: "vAS DASD ASD ASD -%s" % i for i in range(10)
+# }
 
 # for i in range(1000000):
 #     streamback.send("loggy.log", {
@@ -29,10 +31,22 @@ d = {
 #         "date": datetime.datetime.now().isoformat()
 #     })
 
-response = streamback.send("test_input", {
-    "something1": "hello there",
-    "something2": "hello there2"
-}).flush()
+# response = streamback.send("test_input", {
+#     "something1": "hello there",
+#     "something2": "hello there2"
+# }).flush()
+
+class Response(object):
+    def __init__(self, message):
+        self.message = message
+
+
+response = streamback.send("test_map", {
+    "test_key1": "hello there",
+    "test_key2": "hello there2"
+}).read("main_app", map=Response)
+
+print("response:", response,response.message)
 #
 # print(response)
 

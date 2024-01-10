@@ -15,7 +15,9 @@ class Message(object):
         return self.payload.get("feedback_expected")
 
     def respond(self, value=None, payload=None):
-        self.streamback.send_feedback(topic=self.feedback_topic, value=value, payload=payload)
+        self.streamback.send_feedback(
+            topic=self.feedback_topic, value=value, payload=payload
+        )
 
     @property
     def value(self):
@@ -32,6 +34,9 @@ class Message(object):
     @property
     def source_group(self):
         return self.payload.get("source_group")
+
+    def map(self, mapper):
+        return mapper(**self.value)
 
     def __repr__(self):
         return "<Message topic=%s, payload=%s, key=%s>" % (

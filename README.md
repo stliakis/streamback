@@ -158,6 +158,44 @@ message3 = stream.read()
 
 ----
 
+## Consumer input mapping to objects
+
+For a more type oriented approach you can map the input of the consumer to a class.
+
+```python
+class TestInput(object):
+    def __init__(self, arg1, arg2):
+        self.arg1 = arg1
+        self.arg2 = arg2
+
+@streamback.listen("test_input")
+def test_input(context, message):
+    input = message.map(TestInput)
+    print(input.arg1)
+    print(input.arg2)
+    message.respond({
+        "arg1": input.arg1,
+        "arg2": input.arg2
+    })
+```
+
+## Producer feedback mapping to objects
+
+In a similar way you can map the feedback of the producer to a class.
+
+```python
+class TestResponse(object):
+    def __init__(self, arg1, arg2):
+        self.arg1 = arg1
+        self.arg2 = arg2
+
+
+response = streamback.send("test_input", {"arg1": "Hello world!", "arg2": "Hello world!"}).read("main_app",
+                                                                                                map=TestResponse)
+print(response.arg1)
+print(response.arg2)
+```
+
 ## Input injection
 
 Instead of having to deconstruct the message.value inside the consumer's logic, you can pass

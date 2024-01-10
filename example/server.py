@@ -14,7 +14,7 @@ streamback = Streamback(
     "main_app",
     streams="main=kafka://kafka:9092&feedback=redis://redis:6379&topics_prefix=stefanos-dev-topics",
     on_exception=on_exception,
-    log_level="DEBUG"
+    log_level="DEBUG",
 )
 
 
@@ -40,9 +40,7 @@ def test_input(something1, something2):
 @streamback.listen("test_streaming")
 def test_streaming(context, message):
     for i in range(10):
-        message.respond({
-            "message": "hello back {}".format(i)
-        })
+        message.respond({"message": "hello back {}".format(i)})
         time.sleep(0.1)
 
 
@@ -54,6 +52,20 @@ def test_hello(context, message):
     # })
     pass
     # a = 1 / 0
+
+
+@streamback.listen("test_map")
+def test_map(context, message):
+    class MessageValue(object):
+        def __init__(self, test_key1, test_key2):
+            self.test_key1 = test_key1
+            self.test_key2 = test_key2
+
+    input = message.map(MessageValue)
+
+    print("input:", input, input.test_key1, input.test_key2)
+
+    message.respond({"message": "hello back"})
 
 
 @streamback.listen("new_log")

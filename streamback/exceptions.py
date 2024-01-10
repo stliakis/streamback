@@ -35,3 +35,8 @@ class FeedbackError(Exception):
 
     def __repr__(self):
         return self.message
+
+
+class InvalidMessageType(Exception):
+    def __init__(self, message):
+        self.message = message
