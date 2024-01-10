@@ -30,6 +30,9 @@ class Stream(object):
     def get_pending_messages_count(self):
         return 0
 
+    def close(self):
+        raise NotImplementedError
+
 
 class KafkaStream(Stream):
     def __init__(self, kafka_host):
@@ -41,6 +44,10 @@ class KafkaStream(Stream):
         self.kafka_consumer = self.create_kafka_consumer()
         self.flush_timeout = flush_timeout
         self.auto_flush_messages_count = auto_flush_messages_count
+
+    def close(self):
+        self.kafka_producer.flush()
+        self.kafka_consumer.close()
 
     def create_kafka_producer(self):
         return Producer(
@@ -181,6 +188,9 @@ class RedisStream(Stream):
 
     def flush(self):
         pass
+
+    def close(self):
+        self.redis_client.close()
 
 
 class ParsedStreams(object):

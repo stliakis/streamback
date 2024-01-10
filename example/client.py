@@ -46,7 +46,9 @@ response = streamback.send("test_map", {
     "test_key2": "hello there2"
 }).read("main_app", map=Response)
 
-print("response:", response,response.message)
+print("response:", response, response.message)
+
+streamback.close()
 #
 # print(response)
 

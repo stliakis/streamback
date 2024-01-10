@@ -15,20 +15,20 @@ from .utils import log
 
 class Streamback(object):
     def __init__(
-        self,
-        name,
-        streams=None,
-        topics_prefix=None,
-        main_stream=None,
-        feedback_stream=None,
-        feedback_timeout=60,
-        feedback_ttl=300,
-        main_stream_timeout=5,
-        auto_flush_messages_count=200,
-        on_exception=None,
-        callbacks=None,
-        log_level="INFO",
-        **kwargs
+            self,
+            name,
+            streams=None,
+            topics_prefix=None,
+            main_stream=None,
+            feedback_stream=None,
+            feedback_timeout=60,
+            feedback_ttl=300,
+            main_stream_timeout=5,
+            auto_flush_messages_count=200,
+            on_exception=None,
+            callbacks=None,
+            log_level="INFO",
+            **kwargs
     ):
         self.initialize_logger(log_level)
 
@@ -124,13 +124,13 @@ class Streamback(object):
         return value
 
     def send(
-        self,
-        topic,
-        value=None,
-        payload=None,
-        key=None,
-        event=Events.MAIN_STREAM_MESSAGE,
-        flush=False,
+            self,
+            topic,
+            value=None,
+            payload=None,
+            key=None,
+            event=Events.MAIN_STREAM_MESSAGE,
+            flush=False,
     ):
         topic = self.get_topic_real_name(topic)
 
@@ -257,7 +257,7 @@ class Streamback(object):
     def start(self):
         topics = list(self.listeners.keys())
         for message in self.main_stream.read_stream(
-            streamback=self, topics=topics, timeout=None
+                streamback=self, topics=topics, timeout=None
         ):
             log(
                 DEBUG,
@@ -324,6 +324,14 @@ class Streamback(object):
         self.callbacks.append(callback)
         return self
 
+    def close(self):
+        log(INFO, "CLOSING_STREAMBACK")
+
+        if self.feedback_stream:
+            self.feedback_stream.close()
+        if self.main_stream:
+            self.main_stream.close()
+
 
 class FeedbackLane(object):
     def __init__(self, streamback, feedback_topic, feedback_stream):
@@ -355,9 +363,9 @@ class FeedbackLane(object):
             )
 
         for feedback in self.feedback_stream.read_stream(
-            streamback=self,
-            topics=[self.feedback_topic],
-            timeout=timeout or self.streamback.feedback_timeout,
+                streamback=self,
+                topics=[self.feedback_topic],
+                timeout=timeout or self.streamback.feedback_timeout,
         ):
             if from_group and feedback.source_group != from_group:
                 continue
