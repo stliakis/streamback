@@ -15,7 +15,7 @@ else:
 
 setup(
     name="streamback",
-    version="0.0.38",
+    version="0.0.39",
     author='Stefanos Liakis',
     author_email='stliakis@gmail.com',
     description="Two way streams for your microservices",
