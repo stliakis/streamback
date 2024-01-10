@@ -1,6 +1,8 @@
 import time
 from logging import INFO
 
+import inspect
+
 from .utils import log
 from .retry_strategy import RetryStrategy
 
@@ -16,6 +18,11 @@ class Listener(object):
         self.input = input or self.input
         self.function = function or self.function
         self.retry_strategy = retry_strategy or self.retry_strategy
+
+    def get_listener_function_valid_arguments(self):
+        if self.function:
+            return list(inspect.signature(self.function).parameters.keys())
+        return list(inspect.signature(self.consume).parameters.keys())
 
     def try_to_consume(self, context, message, retry_times=0):
         try:
@@ -60,7 +67,14 @@ class Listener(object):
 
     def consume(self, context, message):
         if self.function:
-            self.function(context, message)
+            valid_arguments = self.get_listener_function_valid_arguments()
+
+            args = []
+            if "context" in valid_arguments:
+                args.append(context)
+            args.append(message)
+
+            self.function(*args)
 
     def consume_input(self, *args, **kwargs):
         if self.function:

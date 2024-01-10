@@ -55,7 +55,7 @@ def test_hello(context, message):
 
 
 @streamback.listen("test_map")
-def test_map(context, message):
+def test_map(message):
     class MessageValue(object):
         def __init__(self, test_key1, test_key2):
             self.test_key1 = test_key1
