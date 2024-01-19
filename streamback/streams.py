@@ -65,6 +65,7 @@ class KafkaStream(Stream):
             {
                 "bootstrap.servers": ",".join(self.kafka_hosts),
                 "group.id": self.group_name,
+                "max.partition.fetch.bytes": 16,
                 "auto.offset.reset": "earliest",
                 "fetch.min.bytes": 1,
                 "enable.auto.commit": False
