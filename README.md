@@ -158,6 +158,15 @@ message3 = stream.read()
 
 ----
 
+## SASL Authentication
+
+```python
+streamback = Streamback(
+    "example_producer_app",
+    streams="main=kafka://user@1234:kafka:9092&feedback=redis://redis:6379"
+)
+```
+
 ## Consumer input mapping to objects
 
 For a more type oriented approach you can map the input of the consumer to a class.

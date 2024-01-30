@@ -44,6 +44,12 @@ class Streamback(object):
             self.main_stream = parsed_streams.main_stream
             self.feedback_stream = parsed_streams.feedback_stream
             self.topics_prefix = parsed_streams.topics_prefix
+            if parsed_streams.group_name:
+                self.name = parsed_streams.group_name
+                log(
+                    WARNING,
+                    "STREAMBACK_GROUP_NAME_OVERRIDE[name={name}]".format(name=self.name),
+                )
         else:
             self.main_stream = main_stream
             self.feedback_stream = feedback_stream
@@ -52,7 +58,7 @@ class Streamback(object):
             self.main_stream.initialize(
                 name,
                 flush_timeout=main_stream_timeout,
-                auto_flush_messages_count=auto_flush_messages_count,
+                auto_flush_messages_count=auto_flush_messages_count
             )
 
         if self.feedback_stream:
@@ -381,7 +387,6 @@ class FeedbackLane(object):
 
     def read(self, from_group, timeout=None, map=None):
         message = self.read_message(from_group, timeout=timeout)
-        print("message:", message)
         if message:
             if map:
                 return map(**message.value)
