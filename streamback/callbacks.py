@@ -11,3 +11,6 @@ class Callback(object):
 
     def on_fork(self):
         pass
+
+    def on_master_tick(self, listener_processes):
+        pass

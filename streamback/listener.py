@@ -84,3 +84,6 @@ class Listener(object):
     def consume_input(self, *args, **kwargs):
         if self.function:
             self.function(*args, **kwargs)
+
+    def __repr__(self):
+        return "Listener[topic=%s,function=%s]" % (self.topic, self.function.__name__)
