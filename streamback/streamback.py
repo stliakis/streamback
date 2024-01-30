@@ -4,7 +4,8 @@ import time
 import traceback
 from logging import INFO, ERROR, WARNING, DEBUG
 import uuid
-
+import signal
+import sys
 import multiprocessing
 
 from .exceptions import CouldNotFlushToMainStream, FeedbackError, InvalidMessageType
@@ -109,6 +110,10 @@ class Streamback(object):
         )
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
+
+    def on_fork(self):
+        for callback in self.get_callbacks():
+            callback.on_fork()
 
     def get_payload_metadata(self):
         return {"source_group": self.name}
@@ -273,9 +278,9 @@ class Streamback(object):
             self.add_listener(listener)
 
     def start_listener(self, listener):
-        print("Adsad")
         self.initialize_streams()
-        print("staring")
+        self.on_fork()
+
         for message in self.main_stream.read_stream(
                 streamback=self, topics=[listener.topic], timeout=None
         ):
@@ -326,6 +331,18 @@ class Streamback(object):
                 if self.feedback_stream and message.feedback_topic:
                     self.send_feedback_end(message.feedback_topic)
 
+    def _start_listener(self, listener):
+        def signal_handler(sig, frame):
+            self.close()
+            sys.exit(0)
+
+        signal.signal(signal.SIGTERM, signal_handler)
+
+        try:
+            self.start_listener(listener)
+        except (KeyboardInterrupt, Exception):
+            self.close()
+
     def start(self):
         processes = []
         all_listeners = []
@@ -343,7 +360,7 @@ class Streamback(object):
 
         for listener in all_listeners:
             for i in range(listener.concurrency):
-                process = multiprocessing.Process(target=self.start_listener, args=(listener,))
+                process = multiprocessing.Process(target=self._start_listener, args=(listener,))
                 process.start()
                 processes.append(process)
 
