@@ -14,7 +14,8 @@ stream Kafka is intended to be used as.
 Streamback implements two different streams, the main stream and the feedback stream.
 
 - **Main stream**: This is the kafka stream that the producer sends messages to the consumer.
-- **Feedback stream**: This is the stream that the consumer sends messages to the producer. Redis is used for this stream for its
+- **Feedback stream**: This is the stream that the consumer sends messages to the producer. Redis is used for this
+  stream for its
 - simplicity and speed.
 
 ### Why not just use the conventional one way streams?
@@ -66,7 +67,7 @@ streamback = Streamback(
     streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
-streamback.send("test_hello", {"something":"Hello world!"})
+streamback.send("test_hello", {"something": "Hello world!"})
 ```
 
 ----
@@ -103,7 +104,7 @@ streamback = Streamback(
     streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
-message = streamback.send("test_hello_stream", {"something":"Hello world!"}).read(timeout=10)
+message = streamback.send("test_hello_stream", {"something": "Hello world!"}).read(timeout=10)
 print(message)
 ```
 
@@ -144,12 +145,12 @@ streamback = Streamback(
     streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
-for message in streamback.send("test_hello_stream", {"something":"Hello world!"}).stream():
+for message in streamback.send("test_hello_stream", {"something": "Hello world!"}).stream():
     print(message)
 
 ## OR
 
-stream = streamback.send("test_hello_stream", {"something":"Hello world!"})
+stream = streamback.send("test_hello_stream", {"something": "Hello world!"})
 
 message1 = stream.read()
 message2 = stream.read()
@@ -158,10 +159,11 @@ message3 = stream.read()
 
 ----
 
-
 ### Concurrent consumers
-Streamback supports concurrent consumers via process forking, when you call streamback.start(), the process forks for 
-each of the consumers you have defined. On each consumer you can define the number of processes you want to run, by default each listener
+
+Streamback supports concurrent consumers via process forking, when you call streamback.start(), the process forks for
+each of the consumers you have defined. On each consumer you can define the number of processes you want to run, by
+default each listener
 creates one process but you can change this to fine tune the performance of your consumers.
 
 ```python
@@ -172,13 +174,16 @@ streamback = Streamback(
     streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
-@streamback.listen("test_hello", concurrency=2) ## spawns 2 processes for this listener
+
+@streamback.listen("test_hello", concurrency=2)  ## spawns 2 processes for this listener
 def test_hello(context, message):
     print("received: {value}".format(value=message.value))
-    
-@streamback.listen("test_hello_2", concurrency=20) ## spawns 20 processes for this listener
+
+
+@streamback.listen("test_hello_2", concurrency=20)  ## spawns 20 processes for this listener
 def test_hello_2(context, message):
     print("received: {value}".format(value=message.value))
+
 
 streamback.start()
 ```
@@ -201,6 +206,7 @@ class TestInput(object):
     def __init__(self, arg1, arg2):
         self.arg1 = arg1
         self.arg2 = arg2
+
 
 @streamback.listen("test_input")
 def test_input(context, message):
@@ -235,13 +241,13 @@ print(response.arg2)
 Instead of having to deconstruct the message.value inside the consumer's logic, you can pass
 to the consumer only the arguments of the message.value that you want to use.
 
-
 ```python
-@streamback.listen("test_input", input = ["arg1", "arg2"])
+@streamback.listen("test_input", input=["arg1", "arg2"])
 def test_input(arg1, arg2):
     pass
 
-streamback.send("test_input", {"arg1":"Hello world!", "arg2": "Hello world!"})
+
+streamback.send("test_input", {"arg1": "Hello world!", "arg2": "Hello world!"})
 ```
 
 ### Class based consumers
@@ -300,6 +306,7 @@ streamback.start()
 ```python
 from streamback import Streamback, Callback
 
+
 class StreambackCallbacks(Callback):
     def on_consume_begin(self, streamback, listener, context, message):
         print("on_consume_begin:", message)
@@ -312,7 +319,8 @@ class StreambackCallbacks(Callback):
 
     def on_fork(self):
         print("on_fork")
-        
+
+
 streamback = Streamback(
     "example_consumer_app",
     streams="main=kafka://kafka:9092&feedback=redis://redis:6379",
@@ -321,7 +329,8 @@ streamback = Streamback(
 
 ## Extensions
 
-By using the callbacks mechanism new extensions can be created to inject custom logic into the lifecycle of Streamback. For example
+By using the callbacks mechanism new extensions can be created to inject custom logic into the lifecycle of Streamback.
+For example
 the ListenerStats extension can be used to log the memory usage of each listener.
 
 ```python
@@ -333,15 +342,18 @@ streamback = Streamback(
 ).add_callback(ListenerStats(interval=10))
 ```
 
-The above will log the memory usage of the listeners every 10 seconds, you can extend the ListenerStats class to add custom 
+The above will log the memory usage of the listeners every 10 seconds, you can extend the ListenerStats class to add
+custom
 logic like reporting the memory usage to a monitoring service.
 
 ```python
 from streamback import Streamback, ListenerStats
 
+
 class MyListenerStats(ListenerStats):
     def on_stats(self, stats):
         print(stats)
+
 
 streamback = Streamback(
     "example_consumer_app",
