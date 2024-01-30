@@ -319,6 +319,36 @@ streamback = Streamback(
 ).add_callback(StreambackCallbacks())
 ```
 
+## Extensions
+
+By using the callbacks mechanism new extensions can be created to inject custom logic into the lifecycle of Streamback. For example
+the ListenerStats extension can be used to log the memory usage of each listener.
+
+```python
+from streamback import Streamback, ListenerStats
+
+streamback = Streamback(
+    "example_consumer_app",
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379",
+).add_callback(ListenerStats(interval=10))
+```
+
+The above will log the memory usage of the listeners every 10 seconds, you can extend the ListenerStats class to add custom 
+logic like reporting the memory usage to a monitoring service.
+
+```python
+from streamback import Streamback, ListenerStats
+
+class MyListenerStats(ListenerStats):
+    def on_stats(self, stats):
+        print(stats)
+
+streamback = Streamback(
+    "example_consumer_app",
+    streams="main=kafka://kafka:9092&feedback=redis://redis:6379",
+).add_callback(MyListenerStats(interval=10))
+```
+
 ### Why python 2.7 compatible?
 
 Streamback has been created for usage in car.gr's systems which has some legacy python 2.7 services. We are are planing
