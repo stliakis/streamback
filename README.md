@@ -295,37 +295,29 @@ streamback.include_router(some_consumers_router)
 streamback.start()
 ```
 
-## Handling consume exceptions
-You can pass the on_exception callback upon creating the Streamback object to handle exceptions that occur during the consumption of messages by the listeners
+## Handling consume exceptions and other callbacks
 
 ```python
+from streamback import Streamback, Callback
 
-from streamback import Streamback
+class StreambackCallbacks(Callback):
+    def on_consume_begin(self, streamback, listener, context, message):
+        print("on_consume_begin:", message)
 
-def on_exception(listener, context, message, exception):
-    print("on_exception:", listener, context, message, exception)
+    def on_consume_end(self, streamback, listener, context, message, exception=None):
+        print("on_consume_end:", message, exception)
 
+    def on_consume_exception(self, streamback, listener, exception, context, message):
+        print("on_consume_exception:", type(exception))
+
+    def on_fork(self):
+        print("on_fork")
+        
 streamback = Streamback(
     "example_consumer_app",
     streams="main=kafka://kafka:9092&feedback=redis://redis:6379",
-    on_exception=on_exception
-)
+).add_callback(StreambackCallbacks())
 ```
-
-```python
-
-from streamback import Streamback
-
-def on_exception(listener, context, message, exception):
-    print("on_exception:", listener, context, message, exception)
-
-streamback = Streamback(
-    "example_consumer_app",
-    streams="main=kafka://kafka:9092&feedback=redis://redis:6379",
-    on_exception=on_exception
-)
-```
-
 
 ### Why python 2.7 compatible?
 
