@@ -352,7 +352,7 @@ class Streamback(object):
                 all_listeners.append(listener)
 
         log(INFO,
-            "WILL_START_PROCESSES[num={num},listeners={listeners}]".format(num=len(all_listeners), listeners=",".join([
+            "STARTING_PROCESSES[num={num},listeners={listeners}]".format(num=len(all_listeners), listeners=",".join([
                 "%s:%s[procs=%s]" % (listener.topic, listener.function.__name__, listener.concurrency) for listener in
                 all_listeners if
                 listener.function
