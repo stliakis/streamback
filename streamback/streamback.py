@@ -5,6 +5,8 @@ import traceback
 from logging import INFO, ERROR, WARNING, DEBUG
 import uuid
 
+import multiprocessing
+
 from .exceptions import CouldNotFlushToMainStream, FeedbackError, InvalidMessageType
 from .context import ConsumerContext
 from .events import Events
@@ -38,6 +40,8 @@ class Streamback(object):
         self.feedback_ttl = feedback_ttl
         self.on_exception = on_exception
         self.topics_prefix = topics_prefix
+        self.main_stream_timeout = main_stream_timeout
+        self.auto_flush_messages_count = auto_flush_messages_count
 
         if streams:
             parsed_streams = ParsedStreams(streams)
@@ -54,22 +58,6 @@ class Streamback(object):
             self.main_stream = main_stream
             self.feedback_stream = feedback_stream
 
-        if self.main_stream:
-            self.main_stream.initialize(
-                name,
-                flush_timeout=main_stream_timeout,
-                auto_flush_messages_count=auto_flush_messages_count
-            )
-
-        if self.feedback_stream:
-            self.feedback_stream.initialize(name)
-
-            if isinstance(self.feedback_stream, KafkaStream):
-                log(
-                    WARNING,
-                    "kafka is not recommended for feedback stream, use redis instead",
-                )
-
         self.listeners = {}
         self.routers = []
 
@@ -81,6 +69,28 @@ class Streamback(object):
                 feedback_stream=self.feedback_stream,
             ),
         )
+
+    def initialize_main_stream(self):
+        if self.main_stream and not self.main_stream.is_initialized():
+            self.main_stream.initialize(
+                self.name,
+                flush_timeout=self.main_stream_timeout,
+                auto_flush_messages_count=self.auto_flush_messages_count
+            )
+
+    def initialize_feedback_stream(self):
+        if self.feedback_stream and not self.feedback_stream.is_initialized():
+            self.feedback_stream.initialize(self.name)
+
+            if isinstance(self.feedback_stream, KafkaStream):
+                log(
+                    WARNING,
+                    "kafka is not recommended for feedback stream, use redis instead",
+                )
+
+    def initialize_streams(self):
+        self.initialize_main_stream()
+        self.initialize_feedback_stream()
 
     def initialize_logger(self, log_level):
         logger = logging.getLogger("streamback")
@@ -138,6 +148,8 @@ class Streamback(object):
             event=Events.MAIN_STREAM_MESSAGE,
             flush=False,
     ):
+        self.initialize_streams()
+
         topic = self.get_topic_real_name(topic)
 
         payload = payload or {}
@@ -229,12 +241,12 @@ class Streamback(object):
 
         self.feedback_stream.send(topic, payload)
 
-    def listen(self, topic=None, retry=None, input=None):
+    def listen(self, topic=None, retry=None, input=None, concurrency=None):
         def decorator(func):
             if inspect.isclass(func) and issubclass(func, Listener):
                 listener_class = func
                 listener = listener_class(
-                    topic=topic, retry_strategy=retry, input=input
+                    topic=topic, retry_strategy=retry, input=input, concurrency=concurrency
                 )
                 self.add_listener(listener)
             else:
@@ -244,7 +256,7 @@ class Streamback(object):
                     )
                 self.add_listener(
                     Listener(
-                        topic=topic, function=func, retry_strategy=retry, input=input
+                        topic=topic, function=func, retry_strategy=retry, input=input, concurrency=concurrency
                     )
                 )
 
@@ -260,10 +272,12 @@ class Streamback(object):
         for listener in router.listeners:
             self.add_listener(listener)
 
-    def start(self):
-        topics = list(self.listeners.keys())
+    def start_listener(self, listener):
+        print("Adsad")
+        self.initialize_streams()
+        print("staring")
         for message in self.main_stream.read_stream(
-                streamback=self, topics=topics, timeout=None
+                streamback=self, topics=[listener.topic], timeout=None
         ):
             log(
                 DEBUG,
@@ -311,6 +325,30 @@ class Streamback(object):
             elif not failed_listeners:
                 if self.feedback_stream and message.feedback_topic:
                     self.send_feedback_end(message.feedback_topic)
+
+    def start(self):
+        processes = []
+        all_listeners = []
+
+        for topic in self.listeners:
+            for listener in self.listeners[topic]:
+                all_listeners.append(listener)
+
+        log(INFO,
+            "WILL_START_PROCESSES[num={num},listeners={listeners}]".format(num=len(all_listeners), listeners=",".join([
+                "%s:%s[procs=%s]" % (listener.topic, listener.function.__name__, listener.concurrency) for listener in
+                all_listeners if
+                listener.function
+            ])))
+
+        for listener in all_listeners:
+            for i in range(listener.concurrency):
+                process = multiprocessing.Process(target=self.start_listener, args=(listener,))
+                process.start()
+                processes.append(process)
+
+        for process in processes:
+            process.join()
 
     def get_callbacks(self):
         return self.callbacks

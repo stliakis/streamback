@@ -14,6 +14,8 @@ from .utils import log, listify
 
 
 class Stream(object):
+    initialized = False
+
     def initialize(self, group_name, timeout=10):
         raise NotImplementedError
 
@@ -35,6 +37,9 @@ class Stream(object):
     def get_pending_messages_count(self):
         return 0
 
+    def is_initialized(self):
+        return self.initialized
+
     def close(self):
         raise NotImplementedError
 
@@ -55,6 +60,7 @@ class KafkaStream(Stream):
         self.kafka_consumer = self.create_kafka_consumer()
         self.flush_timeout = flush_timeout
         self.auto_flush_messages_count = auto_flush_messages_count
+        self.initialized = True
 
     def close(self):
         self.kafka_producer.flush()
@@ -203,6 +209,7 @@ class RedisStream(Stream):
             port=int(self.redis_host.split(":")[1]),
             password=None,
         )
+        self.initialized = True
 
     def send(self, topic, payload, key=None, flush=None):
         self.redis_client.lpush(topic, self.serialize_payload(payload))
