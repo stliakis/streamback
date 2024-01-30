@@ -1,11 +1,13 @@
 import logging
 import sys
 
+import os
+
 logger = logging.getLogger("streamback")
 
 
 def log(level, msg):
-    logger.log(level, msg)
+    logger.log(level, "(%s)%s" % (os.getpid(), msg))
 
 
 def listify(obj):
