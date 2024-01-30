@@ -291,43 +291,36 @@ class Streamback(object):
 
             context = ConsumerContext(streamback=self)
 
-            listeners = self.listeners.get(message.topic, [])
-            failed_listeners = []
-            for listener in listeners:
-                try:
-                    for callback in self.get_callbacks():
-                        callback.on_consume_begin(self, listener, context, message)
-                    listener.try_to_consume(context, message)
-                    for callback in self.get_callbacks():
-                        callback.on_consume_end(self, listener, context, message)
-                except Exception as e:
-                    log(
-                        ERROR,
-                        "LISTENER_ERROR[listener={listener} error={error}]".format(
-                            listener=listener, error=str(e)
-                        ),
+            failure = None
+            try:
+                for callback in self.get_callbacks():
+                    callback.on_consume_begin(self, listener, context, message)
+                listener.try_to_consume(context, message)
+                for callback in self.get_callbacks():
+                    callback.on_consume_end(self, listener, context, message)
+            except Exception as e:
+                log(
+                    ERROR,
+                    "LISTENER_ERROR[listener={listener} error={error}]".format(
+                        listener=listener, error=str(e)
+                    ),
+                )
+                traceback.print_exc()
+                failure = [listener, e, context, message]
+                for callback in self.get_callbacks():
+                    callback.on_consume_end(
+                        self, listener, context, message, exception=e
                     )
-                    traceback.print_exc()
-                    failed_listeners.append([listener, e, context, message])
-                    for callback in self.get_callbacks():
-                        callback.on_consume_end(
-                            self, listener, context, message, exception=e
-                        )
-                finally:
+            finally:
+                message.ack()
 
-                    message.ack()
-
-            if failed_listeners:
-                errors = []
-                for failed_listener in failed_listeners:
-                    self.consume_exception(*failed_listener)
-                    errors.append(repr(failed_listener[1]))
-
+            if failure:
+                self.consume_exception(*failure)
                 if self.feedback_stream and message.feedback_topic:
                     self.send_feedback_end(
-                        message.feedback_topic, with_error=", ".join(errors)
+                        message.feedback_topic, with_error=repr(failure[1])
                     )
-            elif not failed_listeners:
+            else:
                 if self.feedback_stream and message.feedback_topic:
                     self.send_feedback_end(message.feedback_topic)
 
