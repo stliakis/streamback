@@ -363,6 +363,9 @@ class Streamback(object):
             log(INFO, "MASTER_PROCESS_KILLED")
             for listener, process in listener_processes:
                 process.terminate()
+                process.join()
+            self.close()
+            sys.exit(0)
 
         signal.signal(signal.SIGTERM, signal_handler)
 

@@ -48,6 +48,8 @@ class KafkaStream(Stream):
     def __init__(self, kafka_host, authentication=None):
         self.kafka_hosts = listify(kafka_host)
         self.authentication = authentication
+        self.kafka_consumer = None
+        self.kafka_producer = None
 
     def initialize(
             self,
@@ -63,8 +65,10 @@ class KafkaStream(Stream):
         self.initialized = True
 
     def close(self):
-        self.kafka_producer.flush()
-        self.kafka_consumer.close()
+        if self.kafka_producer:
+            self.kafka_producer.flush()
+        if self.kafka_consumer:
+            self.kafka_consumer.close()
 
     def extend_config_with_authentication(self, config):
         if isinstance(self.authentication, UsernamePasswordAuthentication):
@@ -193,6 +197,7 @@ class KafkaStream(Stream):
 class RedisStream(Stream):
     def __init__(self, redis_host):
         self.redis_host = redis_host
+        self.redis_client = None
 
     def initialize(
             self,
@@ -242,7 +247,8 @@ class RedisStream(Stream):
         pass
 
     def close(self):
-        self.redis_client.close()
+        if self.redis_client:
+            self.redis_client.close()
 
 
 class UsernamePasswordAuthentication(object):
