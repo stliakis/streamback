@@ -354,7 +354,7 @@ class Streamback(object):
             ])))
 
         for listener in all_listeners:
-            for i in range(listener.concurrency):
+            for i in range(int(listener.concurrency)):
                 process = multiprocessing.Process(target=self._start_listener, args=(listener,))
                 process.start()
                 listener_processes.append((listener, process))
