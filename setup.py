@@ -6,11 +6,11 @@ with open('README.md', 'r') as fh:
 
 if sys.version_info >= (2, 7) and sys.version_info < (3,):
     REQUIRES = [
-        "redis>=2.10.6", "confluent-kafka==1.7.0"
+        "redis>=2.10.6", "confluent-kafka==1.7.0", "psutil>=5.8.0"
     ]
 else:
     REQUIRES = [
-        "redis>=2.10.6", "confluent-kafka>=1.7.0"
+        "redis>=2.10.6", "confluent-kafka>=1.7.0", "psutil>=5.8.0"
     ]
 
 setup(

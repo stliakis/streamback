@@ -8,7 +8,8 @@ import signal
 import sys
 import multiprocessing
 
-from .exceptions import CouldNotFlushToMainStream, FeedbackError, InvalidMessageType
+from .feedback_lane import FeedbackLane
+from .exceptions import InvalidMessageType
 from .context import ConsumerContext
 from .events import Events
 from .listener import Listener
@@ -61,15 +62,6 @@ class Streamback(object):
 
         self.listeners = {}
         self.routers = []
-
-        log(
-            INFO,
-            "STREAMBACK_INITIALIZED[name={name},main_stream={main_stream},feedback_stream={feedback_stream}]".format(
-                name=name,
-                main_stream=self.main_stream,
-                feedback_stream=self.feedback_stream,
-            ),
-        )
 
     def initialize_main_stream(self):
         if self.main_stream and not self.main_stream.is_initialized():
@@ -278,6 +270,7 @@ class Streamback(object):
             self.add_listener(listener)
 
     def start_listener(self, listener):
+        self.listeners = {listener.topic: [listener]}
         self.initialize_streams()
         self.on_fork()
 
@@ -295,7 +288,15 @@ class Streamback(object):
             try:
                 for callback in self.get_callbacks():
                     callback.on_consume_begin(self, listener, context, message)
+
+                begin = time.time()
                 listener.try_to_consume(context, message)
+                end = time.time()
+
+                log(DEBUG, "CONSUME_SUCCESS[listener={listener}, took_ms={took}]".format(listener=listener,
+                                                                                         took=round(
+                                                                                             (end - begin) * 1000, 2)))
+
                 for callback in self.get_callbacks():
                     callback.on_consume_end(self, listener, context, message)
             except Exception as e:
@@ -326,6 +327,7 @@ class Streamback(object):
 
     def _start_listener(self, listener):
         def signal_handler(sig, frame):
+            log(INFO, "LISTENER_PROCESS_KILLED[topic={topic}]".format(topic=listener.topic))
             self.close()
             sys.exit(0)
 
@@ -337,7 +339,7 @@ class Streamback(object):
             self.close()
 
     def start(self):
-        processes = []
+        listener_processes = []
         all_listeners = []
 
         for topic in self.listeners:
@@ -346,7 +348,7 @@ class Streamback(object):
 
         log(INFO,
             "STARTING_PROCESSES[num={num},listeners={listeners}]".format(num=len(all_listeners), listeners=",".join([
-                "%s:%s[procs=%s]" % (listener.topic, listener.function.__name__, listener.concurrency) for listener in
+                "%s[procs=%s]" % (listener, listener.concurrency) for listener in
                 all_listeners if
                 listener.function
             ])))
@@ -355,10 +357,22 @@ class Streamback(object):
             for i in range(listener.concurrency):
                 process = multiprocessing.Process(target=self._start_listener, args=(listener,))
                 process.start()
-                processes.append(process)
+                listener_processes.append((listener, process))
 
-        for process in processes:
-            process.join()
+        def signal_handler(sig, frame):
+            log(INFO, "MASTER_PROCESS_KILLED")
+            for listener, process in listener_processes:
+                process.terminate()
+
+        signal.signal(signal.SIGTERM, signal_handler)
+
+        try:
+            while True:
+                for callback in self.get_callbacks():
+                    callback.on_master_tick(listener_processes)
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            pass
 
     def get_callbacks(self):
         return self.callbacks
@@ -374,8 +388,8 @@ class Streamback(object):
         self.listeners.setdefault(listener.topic, []).append(listener)
         return self
 
-    def add_callback(self, callback):
-        self.callbacks.append(callback)
+    def add_callback(self, *callback):
+        self.callbacks.extend(callback)
         return self
 
     def close(self):
@@ -386,71 +400,9 @@ class Streamback(object):
         if self.main_stream:
             self.main_stream.close()
 
-
-class FeedbackLane(object):
-    def __init__(self, streamback, feedback_topic, feedback_stream):
-        self.streamback = streamback
-        self.feedback_topic = feedback_topic
-        self.feedback_stream = feedback_stream
-
-    def stream(self, from_group, timeout=None):
-        for feedback in self.stream_messages(from_group=from_group, timeout=timeout):
-            if feedback:
-                yield feedback.value
-            else:
-                return
-
-    def stream_messages(self, from_group, timeout=None):
-        self.assert_feedback_stream()
-
-        log(
-            INFO,
-            "LISTENING_FOR_FEEDBACK[feedback_topic={feedback_topic},group={from_group}]".format(
-                from_group=from_group, feedback_topic=self.feedback_topic
-            ),
+    def __repr__(self):
+        return "Streamback[name={name},main_stream={main_stream},feedback_stream={feedback_stream}]".format(
+            name=self.name,
+            main_stream=self.main_stream,
+            feedback_stream=self.feedback_stream,
         )
-
-        flushed = self.streamback.main_stream.flush()
-        if not flushed:
-            raise CouldNotFlushToMainStream(
-                "Could not flush to main stream, feedback will not be received"
-            )
-
-        for feedback in self.feedback_stream.read_stream(
-                streamback=self,
-                topics=[self.feedback_topic],
-                timeout=timeout or self.streamback.feedback_timeout,
-        ):
-            if from_group and feedback.source_group != from_group:
-                continue
-
-            log(DEBUG, "RECEIVED_FEEDBACK[{feedback}]".format(feedback=feedback))
-
-            if feedback.event == Events.FEEDBACK_END:
-                return
-            elif feedback.event == Events.FEEDBACK_END_WITH_ERROR:
-                raise FeedbackError(feedback.error)
-            else:
-                yield feedback
-
-    def read(self, from_group, timeout=None, map=None):
-        message = self.read_message(from_group, timeout=timeout)
-        if message:
-            if map:
-                return map(**message.value)
-            return message.value
-
-    def read_message(self, from_group, timeout=None):
-        self.assert_feedback_stream()
-        for feedback in self.stream_messages(from_group=from_group, timeout=timeout):
-            if feedback.event == Events.FEEDBACK_MESSAGE:
-                return feedback
-
-    def flush(self):
-        self.streamback.main_stream.flush()
-
-    def assert_feedback_stream(self):
-        if not self.feedback_stream:
-            raise Exception(
-                "Feedback stream not configured, Streamback is configured as a one way stream"
-            )

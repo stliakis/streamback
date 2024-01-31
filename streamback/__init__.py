@@ -5,6 +5,7 @@ from .router import Router
 from .exceptions import FeedbackError
 from .listener import Listener
 from .callbacks import Callback
+from .extensions.stats import ListenerStats
 
 __all__ = [
     "Streamback",
@@ -14,5 +15,6 @@ __all__ = [
     "Listener",
     "RetryStrategy",
     "FeedbackError",
-    "Callback"
+    "Callback",
+    "ListenerStats"
 ]
