@@ -31,6 +31,7 @@ class Streamback(object):
             auto_flush_messages_count=200,
             on_exception=None,
             callbacks=None,
+            retry_strategy=None,
             log_level="INFO",
             **kwargs
     ):
@@ -43,6 +44,7 @@ class Streamback(object):
         self.on_exception = on_exception
         self.topics_prefix = topics_prefix
         self.main_stream_timeout = main_stream_timeout
+        self.default_retry_strategy = retry_strategy
         self.auto_flush_messages_count = auto_flush_messages_count
 
         if streams:
@@ -174,7 +176,7 @@ class Streamback(object):
 
         log(
             INFO,
-            "DEBUG[topic={topic}, key={key}, payload={payload}, took_ms={took}]".format(
+            "SENDING[topic={topic}, key={key}, payload={payload}, took_ms={took}]".format(
                 topic=topic, key=key, payload="{...}", took=round(took, 2)
             ),
         )
@@ -243,7 +245,8 @@ class Streamback(object):
             if inspect.isclass(func) and issubclass(func, Listener):
                 listener_class = func
                 listener = listener_class(
-                    topic=topic, retry_strategy=retry, input=input, concurrency=concurrency
+                    topic=topic, retry_strategy=retry or self.default_retry_strategy, input=input,
+                    concurrency=concurrency
                 )
                 self.add_listener(listener)
             else:
@@ -253,7 +256,8 @@ class Streamback(object):
                     )
                 self.add_listener(
                     Listener(
-                        topic=topic, function=func, retry_strategy=retry, input=input, concurrency=concurrency
+                        topic=topic, function=func, retry_strategy=retry or self.default_retry_strategy, input=input,
+                        concurrency=concurrency
                     )
                 )
 
@@ -278,7 +282,7 @@ class Streamback(object):
                 streamback=self, topics=[listener.topic], timeout=None
         ):
             log(
-                DEBUG,
+                INFO,
                 "RECEIVED[message={message}]".format(message=message),
             )
 
@@ -316,7 +320,16 @@ class Streamback(object):
                 message.ack()
 
             if failure:
-                self.consume_exception(*failure)
+                try:
+                    self.consume_exception(*failure)
+                except Exception as ex:
+                    log(
+                        ERROR,
+                        "EXCEPTION_WHILE_CONSUMING_EXCEPTION[listener={listener} error={error}]".format(
+                            listener=listener, error=str(ex)
+                        ),
+                    )
+                    traceback.print_exc()
                 if self.feedback_stream and message.feedback_topic:
                     self.send_feedback_end(
                         message.feedback_topic, with_error=repr(failure[1])
