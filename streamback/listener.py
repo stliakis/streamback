@@ -86,4 +86,7 @@ class Listener(object):
             self.function(*args, **kwargs)
 
     def __repr__(self):
-        return "Listener[topic=%s,function=%s]" % (self.topic, self.function.__name__)
+        if self.function:
+            return "Listener[topic=%s,function=%s]" % (self.topic, self.function.__name__)
+        else:
+            return "Listener[topic=%s,name=%s]" % (self.topic, self.__class__.__name__)
