@@ -6,8 +6,7 @@ from logging import INFO, ERROR, WARNING, DEBUG
 import uuid
 import signal
 import sys
-import multiprocessing
-
+from .process_manager import ProcessManager
 from .feedback_lane import FeedbackLane
 from .exceptions import InvalidMessageType
 from .context import ConsumerContext
@@ -273,13 +272,13 @@ class Streamback(object):
         for listener in router.listeners:
             self.add_listener(listener)
 
-    def start_listener(self, listener):
-        self.listeners = {listener.topic: [listener]}
+    def start_listeners(self, topic, listeners):
+        self.listeners = listeners
         self.initialize_streams()
         self.on_fork()
 
         for message in self.main_stream.read_stream(
-                streamback=self, topics=[listener.topic], timeout=None
+                streamback=self, topics=[topic], timeout=None
         ):
             log(
                 INFO,
@@ -288,107 +287,61 @@ class Streamback(object):
 
             context = ConsumerContext(streamback=self)
 
-            failure = None
-            try:
-                for callback in self.get_callbacks():
-                    callback.on_consume_begin(self, listener, context, message)
-
-                begin = time.time()
-                listener.try_to_consume(context, message)
-                end = time.time()
-
-                log(DEBUG, "CONSUME_SUCCESS[listener={listener}, took_ms={took}]".format(listener=listener,
-                                                                                         took=round(
-                                                                                             (end - begin) * 1000, 2)))
-
-                for callback in self.get_callbacks():
-                    callback.on_consume_end(self, listener, context, message)
-            except Exception as e:
-                log(
-                    ERROR,
-                    "LISTENER_ERROR[listener={listener} error={error}]".format(
-                        listener=listener, error=str(e)
-                    ),
-                )
-                traceback.print_exc()
-                failure = [listener, e, context, message]
-                for callback in self.get_callbacks():
-                    callback.on_consume_end(
-                        self, listener, context, message, exception=e
-                    )
-            finally:
-                message.ack()
-
-            if failure:
+            failed_listeners = []
+            for listener in listeners:
                 try:
-                    self.consume_exception(*failure)
-                except Exception as ex:
+                    for callback in self.get_callbacks():
+                        callback.on_consume_begin(self, listener, context, message)
+                    listener.try_to_consume(context, message)
+                    for callback in self.get_callbacks():
+                        callback.on_consume_end(self, listener, context, message)
+                except Exception as e:
                     log(
                         ERROR,
-                        "EXCEPTION_WHILE_CONSUMING_EXCEPTION[listener={listener} error={error}]".format(
-                            listener=listener, error=str(ex)
+                        "LISTENER_ERROR[listener={listener} error={error}]".format(
+                            listener=listener, error=str(e)
                         ),
                     )
                     traceback.print_exc()
+                    failed_listeners.append([listener, e, context, message])
+                    for callback in self.get_callbacks():
+                        callback.on_consume_end(
+                            self, listener, context, message, exception=e
+                        )
+                finally:
+
+                    message.ack()
+
+            if failed_listeners:
+                errors = []
+                for failed_listener in failed_listeners:
+                    self.consume_exception(*failed_listener)
+                    errors.append(repr(failed_listener[1]))
+
                 if self.feedback_stream and message.feedback_topic:
                     self.send_feedback_end(
-                        message.feedback_topic, with_error=repr(failure[1])
+                        message.feedback_topic, with_error=", ".join(errors)
                     )
-            else:
+            elif not failed_listeners:
                 if self.feedback_stream and message.feedback_topic:
                     self.send_feedback_end(message.feedback_topic)
 
-    def _start_listener(self, listener):
+    def _start_listener(self, topic, listeners):
         def signal_handler(sig, frame):
-            log(INFO, "LISTENER_PROCESS_KILLED[topic={topic}]".format(topic=listener.topic))
+            log(INFO, "LISTENER_PROCESS_KILLED[topic={topic}]".format(topic=topic))
             self.close()
             sys.exit(0)
 
         signal.signal(signal.SIGTERM, signal_handler)
 
         try:
-            self.start_listener(listener)
+            self.start_listeners(topic, listeners)
         except (KeyboardInterrupt, Exception):
             self.close()
 
     def start(self):
-        listener_processes = []
-        all_listeners = []
-
-        for topic in self.listeners:
-            for listener in self.listeners[topic]:
-                all_listeners.append(listener)
-
-        log(INFO,
-            "STARTING_PROCESSES[num={num},listeners={listeners}]".format(num=len(all_listeners), listeners=",".join([
-                "%s[procs=%s]" % (listener, listener.concurrency) for listener in
-                all_listeners if
-                listener.function
-            ])))
-
-        for listener in all_listeners:
-            for i in range(int(listener.concurrency)):
-                process = multiprocessing.Process(target=self._start_listener, args=(listener,))
-                process.start()
-                listener_processes.append((listener, process))
-
-        def signal_handler(sig, frame):
-            log(INFO, "MASTER_PROCESS_KILLED")
-            for listener, process in listener_processes:
-                process.terminate()
-                process.join()
-            self.close()
-            sys.exit(0)
-
-        signal.signal(signal.SIGTERM, signal_handler)
-
-        try:
-            while True:
-                for callback in self.get_callbacks():
-                    callback.on_master_tick(listener_processes)
-                time.sleep(0.1)
-        except KeyboardInterrupt:
-            pass
+        process_manager = ProcessManager()
+        process_manager.spin(self, self._start_listener, self.listeners)
 
     def get_callbacks(self):
         return self.callbacks
