@@ -112,10 +112,10 @@ class Streamback(object):
         return {"source_group": self.name}
 
     def flush(self):
-        if self.feedback_stream:
+        if self.feedback_stream and self.feedback_stream.is_initialized():
             self.feedback_stream.flush()
 
-        if self.main_stream:
+        if self.main_stream and self.main_stream.is_initialized():
             return self.main_stream.flush()
 
         return 0
@@ -364,9 +364,9 @@ class Streamback(object):
     def close(self):
         log(INFO, "CLOSING_STREAMBACK")
 
-        if self.feedback_stream:
+        if self.feedback_stream and self.feedback_stream.is_initialized():
             self.feedback_stream.close()
-        if self.main_stream:
+        if self.main_stream and self.main_stream.is_initialized():
             self.main_stream.close()
 
     def __repr__(self):
