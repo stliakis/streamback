@@ -357,7 +357,7 @@ streamback = Streamback(
 ).add_callback(AutoRestart(max_seconds=10, max_memory_mb=100))
 ```
 
-The above will restart the child processes every 10 seconds or when they reach 100mb of rss memory usage.
+The above will restart the child processes every 10 seconds or when it reaches 100mb of rss memory usage.
 
 ### Custom extensions
 
