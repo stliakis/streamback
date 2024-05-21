@@ -7,7 +7,6 @@ from .listener import Listener
 from .callbacks import Callback
 from .extensions.stats import ListenerStats
 from .extensions.auto_restart import AutoRestart
-from .process_manager import TopicProcessMessages
 
 __all__ = [
     "Streamback",
@@ -19,6 +18,5 @@ __all__ = [
     "FeedbackError",
     "Callback",
     "ListenerStats",
-    "AutoRestart",
-    "TopicProcessMessages"
+    "AutoRestart"
 ]

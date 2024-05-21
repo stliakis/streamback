@@ -6,6 +6,7 @@ from logging import INFO
 
 from psutil import NoSuchProcess
 
+from .topic_process_messages import TopicProcessMessages
 from .utils import log
 
 
@@ -31,13 +32,13 @@ class ProcessManager(object):
                                                                                                topic),
                                                                                            ", ".join(str(listener) for
                                                                                                      listener in
-                                                                                                     listeners))
-                                                                                       for topic, listeners in
+                                                                                                     listeners_of_topic))
+                                                                                       for topic, listeners_of_topic in
                                                                                        listeners.items()])))
 
-        for topic, listeners in listeners.items():
+        for topic, listeners_of_topic in listeners.items():
             for i in range(listener_procs_per_topic.get(topic)):
-                topic_process = TopicProcess(topic=topic, listeners=listeners, target=target)
+                topic_process = TopicProcess(topic=topic, listeners=listeners_of_topic, target=target)
                 self.add_topic_process(
                     topic_process
                 )
@@ -46,7 +47,7 @@ class ProcessManager(object):
         def signal_handler(sig, frame):
             log(INFO, "PROCESS_MANAGER_MASTER_PROCESS_KILLED")
             self.terminate_all()
-            streamback.close()
+            streamback.close(all_listeners)
             sys.exit(0)
 
         signal.signal(signal.SIGTERM, signal_handler)
@@ -73,10 +74,6 @@ class ProcessManager(object):
     def send_message_to_all_processes(self, message):
         for topic_process in self.topic_processes:
             topic_process.send_message(message)
-
-
-class TopicProcessMessages(object):
-    TERMINATE = "TERMINATE"
 
 
 class TopicProcess(object):

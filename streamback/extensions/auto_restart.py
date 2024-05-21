@@ -3,8 +3,9 @@ from logging import INFO
 
 import psutil
 
-from streamback import Callback, TopicProcessMessages
+from streamback import Callback
 from streamback.utils import log
+from streamback.topic_process_messages import TopicProcessMessages
 
 
 class AutoRestart(Callback):
