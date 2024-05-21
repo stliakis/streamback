@@ -6,6 +6,7 @@ from .exceptions import FeedbackError
 from .listener import Listener
 from .callbacks import Callback
 from .extensions.stats import ListenerStats
+from .process_manager import TopicProcessMessages
 
 __all__ = [
     "Streamback",
@@ -16,5 +17,6 @@ __all__ = [
     "RetryStrategy",
     "FeedbackError",
     "Callback",
-    "ListenerStats"
+    "ListenerStats",
+    "TopicProcessMessages"
 ]

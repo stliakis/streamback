@@ -6,7 +6,7 @@ from logging import INFO, ERROR, WARNING, DEBUG
 import uuid
 import signal
 import sys
-from .process_manager import ProcessManager
+from .process_manager import ProcessManager, TopicProcessMessages
 from .feedback_lane import FeedbackLane
 from .exceptions import InvalidMessageType
 from .context import ConsumerContext
@@ -272,13 +272,24 @@ class Streamback(object):
         for listener in router.listeners:
             self.add_listener(listener)
 
-    def start_listeners(self, topic, listeners):
+    def on_message_from_master_process(self, message, topic, listeners):
+        log(INFO, "RECEIVED_MESSAGE_FROM_MASTER_PROCESS[message={message}]".format(message=message))
+        if message == TopicProcessMessages.TERMINATE:
+            log(INFO, "LISTENER_PROCESS_KILLED[topic={topic}]".format(topic=topic))
+            self.close(listeners)
+            sys.exit(0)
+
+    def start_listeners(self, pipe, topic, listeners):
         self.listeners = listeners
         self.initialize_streams()
         self.on_fork()
 
+        def on_tick():
+            if pipe.poll():
+                self.on_message_from_master_process(pipe.recv(), topic, listeners)
+
         for message in self.main_stream.read_stream(
-                streamback=self, topics=[topic], timeout=None
+                streamback=self, topics=[topic], timeout=None, on_tick=on_tick
         ):
             log(
                 INFO,
@@ -309,7 +320,6 @@ class Streamback(object):
                             self, listener, context, message, exception=e
                         )
                 finally:
-
                     message.ack()
 
             if failed_listeners:
@@ -326,18 +336,18 @@ class Streamback(object):
                 if self.feedback_stream and message.feedback_topic:
                     self.send_feedback_end(message.feedback_topic)
 
-    def _start_listener(self, topic, listeners):
+    def _start_listener(self, pipe, topic, listeners):
         def signal_handler(sig, frame):
             log(INFO, "LISTENER_PROCESS_KILLED[topic={topic}]".format(topic=topic))
-            self.close()
+            self.close(listeners)
             sys.exit(0)
 
         signal.signal(signal.SIGTERM, signal_handler)
 
         try:
-            self.start_listeners(topic, listeners)
+            self.start_listeners(pipe, topic, listeners)
         except (KeyboardInterrupt, Exception):
-            self.close()
+            self.close(listeners)
 
     def start(self):
         process_manager = ProcessManager()
@@ -361,13 +371,17 @@ class Streamback(object):
         self.callbacks.extend(callback)
         return self
 
-    def close(self):
-        log(INFO, "CLOSING_STREAMBACK")
+    def close(self, listeners):
+        for listener in listeners:
+            log(INFO, "FLUSHING_LISTENER[listener={listener}]".format(listener=listener))
+            listener.flush()
 
         if self.feedback_stream and self.feedback_stream.is_initialized():
             self.feedback_stream.close()
         if self.main_stream and self.main_stream.is_initialized():
             self.main_stream.close()
+
+        log(INFO, "CLOSING_STREAMBACK[]")
 
     def __repr__(self):
         return "Streamback[name={name},main_stream={main_stream},feedback_stream={feedback_stream}]".format(

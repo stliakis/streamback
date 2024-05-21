@@ -81,6 +81,9 @@ class Listener(object):
 
             self.function(*args)
 
+    def flush(self, *args, **kwargs):
+        pass
+
     def consume_input(self, *args, **kwargs):
         if self.function:
             self.function(*args, **kwargs)

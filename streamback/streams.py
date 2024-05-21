@@ -22,7 +22,7 @@ class Stream(object):
     def send(self, topic, payload, key=None, flush=False):
         raise NotImplementedError
 
-    def read_stream(self, streamback, topics, timeout=None):
+    def read_stream(self, streamback, topics, timeout=None, on_tick=None):
         raise NotImplementedError
 
     def serialize_payload(self, data):
@@ -149,7 +149,7 @@ class KafkaStream(Stream):
 
         return True
 
-    def read_stream(self, streamback, topics, timeout=None):
+    def read_stream(self, streamback, topics, timeout=None, on_tick=None):
         consumer = self.kafka_consumer
         consumer.subscribe(topics)
         begin = time.time()
@@ -160,7 +160,10 @@ class KafkaStream(Stream):
         )
 
         while True:
-            msg = consumer.poll(0.1)
+            if on_tick:
+                on_tick()
+
+            msg = consumer.poll(0.05)
 
             if timeout:
                 time_since_begin = time.time() - begin
@@ -223,7 +226,7 @@ class RedisStream(Stream):
     def get_pending_messages_count(self):
         return 0
 
-    def read_stream(self, streamback, topics, timeout=None):
+    def read_stream(self, streamback, topics, timeout=None, on_tick=None):
         while True:
             value = self.redis_client.brpop(topics, timeout=timeout)
 

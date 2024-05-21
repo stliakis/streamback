@@ -23,6 +23,10 @@ class ListenerStats(Callback):
 
         memory_per_topic = {}
         for topic_process in process_manager.topic_processes:
+            if not topic_process.is_process_alive():
+                log(INFO, "PROCESS_IS_DEAD[topic={topic}]".format(topic=topic_process.topic))
+                continue
+
             process = psutil.Process(topic_process.process.pid)
             memory_info = process.memory_info()
             total_rss += memory_info.rss

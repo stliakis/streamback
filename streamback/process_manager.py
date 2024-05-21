@@ -4,6 +4,8 @@ import sys
 import time
 from logging import INFO
 
+from psutil import NoSuchProcess
+
 from .utils import log
 
 
@@ -35,11 +37,11 @@ class ProcessManager(object):
 
         for topic, listeners in listeners.items():
             for i in range(listener_procs_per_topic.get(topic)):
-                process = multiprocessing.Process(target=target, args=(topic, listeners,))
-                process.start()
+                topic_process = TopicProcess(topic=topic, listeners=listeners, target=target)
                 self.add_topic_process(
-                    TopicProcess(topic=topic, listeners=listeners, process=process)
+                    topic_process
                 )
+                topic_process.spawn()
 
         def signal_handler(sig, frame):
             log(INFO, "PROCESS_MANAGER_MASTER_PROCESS_KILLED")
@@ -53,6 +55,10 @@ class ProcessManager(object):
             while True:
                 for callback in streamback.get_callbacks():
                     callback.on_master_tick(self)
+
+                for topic_process in self.topic_processes:
+                    topic_process.on_master_tick()
+
                 time.sleep(0.1)
         except KeyboardInterrupt:
             pass
@@ -64,13 +70,50 @@ class ProcessManager(object):
         for topic_process in self.topic_processes:
             topic_process.terminate()
 
+    def send_message_to_all_processes(self, message):
+        for topic_process in self.topic_processes:
+            topic_process.send_message(message)
+
+
+class TopicProcessMessages(object):
+    TERMINATE = "TERMINATE"
+
 
 class TopicProcess(object):
-    def __init__(self, topic, listeners, process):
+    main_pipe = None
+    child_pipe = None
+    process = None
+    spawn_time = None
+
+    def __init__(self, topic, listeners, target):
         self.topic = topic
         self.listeners = listeners
-        self.process = process
+        self.target = lambda *args, **kwargs: target(*args, **kwargs)
+
+    def spawn(self):
+        main_pipe, child_pipe = multiprocessing.Pipe()
+        self.child_pipe = child_pipe
+        self.main_pipe = main_pipe
+        self.process = multiprocessing.Process(target=self.target,
+                                               args=(child_pipe, self.topic, self.listeners,))
+        self.process.start()
+        self.spawn_time = time.time()
+
+    def is_process_alive(self):
+        try:
+            return self.process.is_alive()
+        except NoSuchProcess:
+            return False
+
+    def on_master_tick(self):
+        if not self.is_process_alive():
+            log(INFO, "PROCESS_IS_DEAD[topic={topic}]".format(topic=self.topic))
+            log(INFO, "RESPAWNING_PROCESS[topic={topic}]".format(topic=self.topic))
+            self.spawn()
+
+    def send_message(self, message):
+        self.main_pipe.send(message)
 
     def terminate(self):
-        self.process.terminate()
+        self.send_message(TopicProcessMessages.TERMINATE)
         self.process.join()

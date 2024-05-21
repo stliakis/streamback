@@ -3,6 +3,8 @@ import sys
 
 import os
 
+import psutil
+
 logger = logging.getLogger("streamback")
 
 
@@ -22,6 +24,16 @@ def reraise_exception(exception):
     else:
         raise exception
 
+def is_child_process_running(parent_pid, child_pid):
+    try:
+        parent = psutil.Process(parent_pid)
+        children = parent.children(recursive=True)
+        for child in children:
+            if child.pid == child_pid:
+                return True
+        return False
+    except psutil.NoSuchProcess:
+        return False
 
 def bytes_to_pretty_string(bytes):
     if bytes < 1024:
