@@ -6,7 +6,8 @@ from confluent_kafka import (
     Producer,
     Consumer,
     KafkaError,
-    KafkaException
+    KafkaException,
+    TopicPartition,
 )
 from .exceptions import FeedbackTimeout, InvalidSteamsString
 from .message import Message, KafkaMessage
@@ -43,21 +44,23 @@ class Stream(object):
     def close(self):
         raise NotImplementedError
 
+    def get_message_count_in_topic(self, topic):
+        raise NotImplementedError
+
 
 class KafkaStream(Stream):
-    def __init__(self, kafka_host, authentication=None):
+    def __init__(self, group_name, kafka_host, authentication=None):
         self.kafka_hosts = listify(kafka_host)
         self.authentication = authentication
+        self.group_name = group_name
         self.kafka_consumer = None
         self.kafka_producer = None
 
     def initialize(
             self,
-            group_name,
             flush_timeout=None,
             auto_flush_messages_count=None,
     ):
-        self.group_name = group_name
         self.kafka_producer = self.create_kafka_producer()
         self.kafka_consumer = self.create_kafka_consumer()
         self.flush_timeout = flush_timeout
@@ -94,10 +97,10 @@ class KafkaStream(Stream):
 
         return Producer(config)
 
-    def create_kafka_consumer(self):
+    def create_kafka_consumer(self, group_name=None):
         config = {
             "bootstrap.servers": ",".join(self.kafka_hosts),
-            "group.id": self.group_name,
+            "group.id": group_name or self.group_name,
             "max.partition.fetch.bytes": 16,
             "auto.offset.reset": "earliest",
             "fetch.min.bytes": 1,
@@ -149,6 +152,24 @@ class KafkaStream(Stream):
 
         return True
 
+    def get_message_count_in_topic(self, topic):
+        consumer = self.create_kafka_consumer(f"{self.group_name}")
+        metadata = consumer.list_topics(topic, timeout=10)
+        partitions = metadata.topics[topic].partitions
+
+        total_unread_messages = 0
+
+        for partition_id in partitions:
+            tp = TopicPartition(topic, partition_id)
+            consumer.assign([tp])
+            low, high = consumer.get_watermark_offsets(tp)
+            committed_offsets = consumer.committed([tp])
+            current_offset = committed_offsets[0].offset
+            unread_messages = high - current_offset
+            total_unread_messages += unread_messages
+
+        return total_unread_messages
+
     def read_stream(self, streamback, topics, timeout=None, on_tick=None):
         consumer = self.kafka_consumer
         consumer.subscribe(topics)
@@ -198,18 +219,17 @@ class KafkaStream(Stream):
 
 
 class RedisStream(Stream):
-    def __init__(self, redis_host):
+    def __init__(self, group_name, redis_host):
         self.redis_host = redis_host
+        self.group_name = group_name
         self.redis_client = None
 
     def initialize(
             self,
-            group_name,
             flush_timeout=5,
             auto_flush_messages_count=None,
             authentication=None
     ):
-        self.group_name = group_name
         self.flush_timeout = flush_timeout
         self.authentication = authentication
         self.redis_client = redis.Redis(
@@ -261,14 +281,23 @@ class UsernamePasswordAuthentication(object):
 
 
 class ParsedStreams(object):
-    def __init__(self, streams_string):
-        self.group_name = None
+    def __init__(self, group_name, streams_string):
+        self.group_name = group_name
         self.main_stream = None
         self.feedback_stream = None
         self.topics_prefix = None
         self.authentication = None
 
         streams = streams_string.split("&")
+        for stream in streams:
+            setting_name = stream.split("=")[0]
+            setting_value = stream.split("=")[1]
+
+            if setting_name == "topics_prefix":
+                self.topics_prefix = setting_value
+            elif setting_name == "group":
+                self.group_name = setting_value
+
         for stream in streams:
             setting_name = stream.split("=")[0]
             setting_value = stream.split("=")[1]
@@ -287,18 +316,16 @@ class ParsedStreams(object):
                     else:
                         authentication = None
 
-                    stream = KafkaStream(value, authentication=authentication)
+                    stream = KafkaStream(self.group_name, value, authentication=authentication)
                 elif protocol == "redis":
-                    stream = RedisStream(value)
+                    stream = RedisStream(self.group_name, value)
 
                 if setting_name == "main":
                     self.main_stream = stream
                 elif setting_name == "feedback":
                     self.feedback_stream = stream
-            elif setting_name == "topics_prefix":
-                self.topics_prefix = setting_value
-            elif setting_name == "group":
-                self.group_name = setting_value
+            elif setting_name in ["topics_prefix", "group"]:
+                continue
             else:
                 log(WARNING, "Unknown setting: %s" % setting_name)
 

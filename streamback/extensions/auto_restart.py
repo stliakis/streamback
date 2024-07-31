@@ -22,7 +22,7 @@ class AutoRestart(Callback):
             if time.time() - self.last_tick < self.check_interval:
                 return
 
-        for topic_process in process_manager.topic_processes:
+        for topic_process in process_manager.get_topic_processes():
             if self.max_seconds:
                 if topic_process.spawn_time < time.time() - self.max_seconds:
                     log(INFO,

@@ -6,6 +6,7 @@ from logging import INFO
 import psutil
 from ..utils import log, bytes_to_pretty_string
 
+total_consumed_messages=0
 
 class ListenerStats(Callback):
     def __init__(self, interval=5):
@@ -22,7 +23,7 @@ class ListenerStats(Callback):
         total_rss, total_vms = 0, 0
 
         memory_per_topic = {}
-        for topic_process in process_manager.topic_processes:
+        for topic_process in process_manager.get_topic_processes():
             if not topic_process.is_process_alive():
                 log(INFO, "PROCESS_IS_DEAD[topic={topic}]".format(topic=topic_process.topic))
                 continue

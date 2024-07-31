@@ -6,6 +6,7 @@ from logging import INFO, ERROR, WARNING, DEBUG
 import uuid
 import signal
 import sys
+import psutil
 from .process_manager import ProcessManager, TopicProcessMessages
 from .feedback_lane import FeedbackLane
 from .exceptions import InvalidMessageType
@@ -28,6 +29,9 @@ class Streamback(object):
             feedback_ttl=300,
             main_stream_timeout=5,
             auto_flush_messages_count=200,
+            rescale_interval=5,
+            rescale_min_process_ttl=10,
+            rescale_max_memory_mb=None,
             on_exception=None,
             callbacks=None,
             retry_strategy=None,
@@ -38,16 +42,20 @@ class Streamback(object):
 
         self.callbacks = callbacks or []
         self.name = name
+        self.manager_name = "streamback_manager_%s" % name
         self.feedback_timeout = feedback_timeout
         self.feedback_ttl = feedback_ttl
         self.on_exception = on_exception
         self.topics_prefix = topics_prefix
         self.main_stream_timeout = main_stream_timeout
+        self.rescale_interval = rescale_interval
         self.default_retry_strategy = retry_strategy
         self.auto_flush_messages_count = auto_flush_messages_count
+        self.rescale_min_process_ttl = rescale_min_process_ttl
+        self.rescale_max_memory_mb = rescale_max_memory_mb
 
         if streams:
-            parsed_streams = ParsedStreams(streams)
+            parsed_streams = ParsedStreams(name, streams)
             self.main_stream = parsed_streams.main_stream
             self.feedback_stream = parsed_streams.feedback_stream
             self.topics_prefix = parsed_streams.topics_prefix
@@ -63,18 +71,27 @@ class Streamback(object):
 
         self.listeners = {}
         self.routers = []
+        self.process_manager = None
 
     def initialize_main_stream(self):
         if self.main_stream and not self.main_stream.is_initialized():
             self.main_stream.initialize(
-                self.name,
                 flush_timeout=self.main_stream_timeout,
                 auto_flush_messages_count=self.auto_flush_messages_count
             )
 
+    def get_current_memory_usage(self):
+        total_rss = 0
+        for topic_process in self.process_manager.get_topic_processes():
+            process = psutil.Process(topic_process.process.pid)
+            memory_info = process.memory_info()
+            total_rss += memory_info.rss
+
+        return total_rss
+
     def initialize_feedback_stream(self):
         if self.feedback_stream and not self.feedback_stream.is_initialized():
-            self.feedback_stream.initialize(self.name)
+            self.feedback_stream.initialize()
 
             if isinstance(self.feedback_stream, KafkaStream):
                 log(
@@ -276,7 +293,7 @@ class Streamback(object):
         log(INFO, "RECEIVED_MESSAGE_FROM_MASTER_PROCESS[message={message}]".format(message=message))
         if message == TopicProcessMessages.TERMINATE:
             log(INFO, "LISTENER_PROCESS_KILLED[topic={topic}]".format(topic=topic))
-            self.close(listeners)
+            self.close(listeners, reason="received terminate from master process")
             sys.exit(0)
 
     def start_listeners(self, pipe, topic, listeners):
@@ -292,7 +309,7 @@ class Streamback(object):
                 streamback=self, topics=[topic], timeout=None, on_tick=on_tick
         ):
             log(
-                INFO,
+                DEBUG,
                 "RECEIVED[message={message}]".format(message=message),
             )
 
@@ -339,7 +356,7 @@ class Streamback(object):
     def _start_listener(self, pipe, topic, listeners):
         def signal_handler(sig, frame):
             log(INFO, "LISTENER_PROCESS_KILLED[topic={topic}]".format(topic=topic))
-            self.close(listeners)
+            self.close(listeners, reason="listener process killed")
             sys.exit(0)
 
         signal.signal(signal.SIGTERM, signal_handler)
@@ -347,11 +364,11 @@ class Streamback(object):
         try:
             self.start_listeners(pipe, topic, listeners)
         except (KeyboardInterrupt, Exception):
-            self.close(listeners)
+            self.close(listeners, reason="exception while starting listeners")
 
     def start(self):
-        process_manager = ProcessManager()
-        process_manager.spin(self, self._start_listener, self.listeners)
+        self.process_manager = ProcessManager(self)
+        self.process_manager.spin(self._start_listener, self.listeners)
 
     def get_callbacks(self):
         return self.callbacks
@@ -371,7 +388,7 @@ class Streamback(object):
         self.callbacks.extend(callback)
         return self
 
-    def close(self, listeners):
+    def close(self, listeners, reason=None):
         for listener in listeners:
             log(INFO, "FLUSHING_LISTENER[listener={listener}]".format(listener=listener))
             listener.flush()
@@ -381,7 +398,7 @@ class Streamback(object):
         if self.main_stream and self.main_stream.is_initialized():
             self.main_stream.close()
 
-        log(INFO, "CLOSING_STREAMBACK[]")
+        log(INFO, "CLOSING_STREAMBACK[reason={reason}]".format(reason=reason))
 
     def __repr__(self):
         return "Streamback[name={name},main_stream={main_stream},feedback_stream={feedback_stream}]".format(
