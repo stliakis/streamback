@@ -367,8 +367,8 @@ class Streamback(object):
             self.close(listeners, reason="exception while starting listeners")
 
     def start(self):
-        self.process_manager = ProcessManager(self)
-        self.process_manager.spin(self._start_listener, self.listeners)
+        self.process_manager = ProcessManager(self, self.listeners, self._start_listener)
+        self.process_manager.spin()
 
     def get_callbacks(self):
         return self.callbacks

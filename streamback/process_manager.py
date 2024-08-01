@@ -14,16 +14,21 @@ class ProcessManager(object):
     topic_process_managers = []
     concurrency_config = None
 
-    def __init__(self, streamback):
+    def __init__(self, streamback, listeners, target):
         self.streamback = streamback
         self.concurrency_config = {}
+        self.target = lambda *args, **kwargs: target(*args, **kwargs)
+        self.listeners_per_topic = listeners
 
-    def spin(self, target, listeners):
+    def get_available_process(self):
+        return self.streamback.get_available_process()
+
+    def spin(self):
         all_listeners = []
-        for topic, listeners_of_topic in listeners.items():
+        for topic, listeners_of_topic in self.listeners_per_topic.items():
             all_listeners.extend(listeners_of_topic)
 
-        for topic, listeners_of_topic in listeners.items():
+        for topic, listeners_of_topic in self.listeners_per_topic.items():
             concurrency_config = ConcurrencyConfig([])
 
             for listener in listeners_of_topic:
@@ -49,7 +54,7 @@ class ProcessManager(object):
                 self,
                 topic=topic,
                 listeners=listeners_of_topic,
-                target=target,
+                target=self.target,
                 concurrency_config=concurrency_config
             ))
 
@@ -126,9 +131,9 @@ class TopicProcessesManager(object):
 
         # if needed_processes_number != 0:
         log(INFO,
-            "SPAWNING_NEEDED_PROCESSES[topic={topic},scaling={scaling},needed={needed},current={current},change={change},current_memory_usage={current_memory_usage}]".format(
+            "CHECKING_PROCESSES[topic={topic},scaling={scaling},needed={needed},current={current},change={change},current_memory_usage={current_memory_usage}]".format(
                 topic=self.topic,
-                scaling=self.concurrency_config,
+                scaling=self.concurrency_config.scaling,
                 needed=needed_number_of_processes,
                 current=current_number_of_processes,
                 change=processes_rescale_number,
@@ -172,12 +177,19 @@ class TopicProcessesManager(object):
         return self.process_manager.streamback.rescale_max_memory_mb
 
     def is_memory_usage_reached(self):
-        return False
-        max_memory_usage = self.get_max_memory_usage_mb() / 1024 / 1024
+        max_allowed_usage = self.get_max_memory_usage_mb()
+        if not max_allowed_usage:
+            return False
+
+        max_memory_usage = max_allowed_usage * 1024 * 1024
+
         if not max_memory_usage:
             return False
 
         memory_usage = self.process_manager.streamback.get_current_memory_usage()
+        print("max_memory:", max_memory_usage)
+        print("current:", memory_usage)
+
         return memory_usage > max_memory_usage
 
     def get_needed_concurrency(self):
