@@ -9,7 +9,7 @@ from streamback.topic_process_messages import TopicProcessMessages
 
 
 class AutoRestart(Callback):
-    def __init__(self, max_seconds=None, max_memory_mb=None, check_interval=1):
+    def __init__(self, max_seconds=None, max_memory_mb=None, check_interval=10):
         self.max_seconds = max_seconds
         self.max_memory_mb = max_memory_mb
         self.last_tick = None

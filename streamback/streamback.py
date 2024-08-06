@@ -22,6 +22,7 @@ class Streamback(object):
             self,
             name,
             streams=None,
+            topics=None,
             topics_prefix=None,
             main_stream=None,
             feedback_stream=None,
@@ -29,7 +30,7 @@ class Streamback(object):
             feedback_ttl=300,
             main_stream_timeout=5,
             auto_flush_messages_count=200,
-            rescale_interval=5,
+            rescale_interval=1,
             rescale_min_process_ttl=10,
             rescale_max_memory_mb=None,
             on_exception=None,
@@ -72,6 +73,8 @@ class Streamback(object):
         self.listeners = {}
         self.routers = []
         self.process_manager = None
+
+        self.listen_only_for_topics = [self.get_topic_real_name(topic) for topic in topics or []]
 
     def initialize_main_stream(self):
         if self.main_stream and not self.main_stream.is_initialized():
@@ -363,8 +366,12 @@ class Streamback(object):
 
         try:
             self.start_listeners(pipe, topic, listeners)
-        except (KeyboardInterrupt, Exception):
-            self.close(listeners, reason="exception while starting listeners")
+        except KeyboardInterrupt as ex:
+            self.close(listeners,
+                       reason="by user")
+        except Exception as ex:
+            self.close(listeners,
+                       reason="exception while starting listeners[exception={exception}]".format(exception=ex))
 
     def start(self):
         self.process_manager = ProcessManager(self, self.listeners, self._start_listener)

@@ -19,6 +19,9 @@ class ProcessManager(object):
         self.concurrency_config = {}
         self.target = lambda *args, **kwargs: target(*args, **kwargs)
         self.listeners_per_topic = listeners
+        if self.streamback.listen_only_for_topics:
+            self.listeners_per_topic = {k: v for k, v in self.listeners_per_topic.items() if
+                                        k in self.streamback.listen_only_for_topics}
 
     def get_available_process(self):
         return self.streamback.get_available_process()
@@ -75,9 +78,6 @@ class ProcessManager(object):
                 for callback in self.streamback.get_callbacks():
                     callback.on_master_tick(self)
 
-                for topic_process in self.topic_process_managers:
-                    topic_process.on_master_tick()
-
                 time.sleep(0.1)
         except KeyboardInterrupt:
             pass
@@ -125,17 +125,18 @@ class TopicProcessesManager(object):
 
     def spawn(self):
         memory_usage = self.process_manager.streamback.get_current_memory_usage()
-        needed_number_of_processes = self.get_needed_concurrency()
+        messages_count, needed_number_of_processes = self.get_needed_concurrency()
         current_number_of_processes = len(self.processes)
         processes_rescale_number = needed_number_of_processes - current_number_of_processes
 
         # if needed_processes_number != 0:
         log(INFO,
-            "CHECKING_PROCESSES[topic={topic},scaling={scaling},needed={needed},current={current},change={change},current_memory_usage={current_memory_usage}]".format(
+            "CHECKING_PROCESSES[topic={topic},scaling={scaling},messages={messages_count},current_memory={current_memory_usage},needed={needed},current={current},change={change}]".format(
                 topic=self.topic,
                 scaling=self.concurrency_config.scaling,
                 needed=needed_number_of_processes,
                 current=current_number_of_processes,
+                messages_count=messages_count,
                 change=processes_rescale_number,
                 current_memory_usage=bytes_to_pretty_string(memory_usage)
             ))
@@ -143,7 +144,7 @@ class TopicProcessesManager(object):
         if processes_rescale_number > 0:
             if self.is_memory_usage_reached():
                 log(INFO,
-                    "MEMORY_USAGE_REACHED[topic={topic},current_memory_usage={current_memory_usage},max_memory_usage={max_memory_usage}MB]".format(
+                    "MEMORY_USAGE_REACHED[topic={topic},current_memory={current_memory_usage},max_memory_usage={max_memory_usage} MB]".format(
                         topic=self.topic,
                         current_memory_usage=bytes_to_pretty_string(memory_usage),
                         max_memory_usage=self.get_max_memory_usage_mb()
@@ -202,9 +203,9 @@ class TopicProcessesManager(object):
             messages_threshold = concurrency[0]
             num_of_procs = concurrency[1]
             if messages_count <= messages_threshold:
-                return num_of_procs
+                return messages_count, num_of_procs
 
-        return self.concurrency_config.scaling[-1][1]
+        return messages_count, self.concurrency_config.scaling[-1][1]
 
     def terminate_all(self):
         for topic_process in self.processes:

@@ -153,7 +153,7 @@ class KafkaStream(Stream):
         return True
 
     def get_message_count_in_topic(self, topic):
-        consumer = self.create_kafka_consumer(f"{self.group_name}")
+        consumer = self.create_kafka_consumer(self.group_name)
         metadata = consumer.list_topics(topic, timeout=10)
         partitions = metadata.topics[topic].partitions
 
