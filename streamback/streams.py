@@ -157,11 +157,12 @@ class KafkaStream(Stream):
         metadata = consumer.list_topics(topic, timeout=10)
         partitions = metadata.topics[topic].partitions
 
-        total_unread_messages = 0
+        if not partitions:
+            log(WARNING, "NO_PARTITIONS_FOR_TOPIC[topic={topic}]".format(topic=topic))
 
+        total_unread_messages = 0
         for partition_id in partitions:
             tp = TopicPartition(topic, partition_id)
-            consumer.assign([tp])
             low, high = consumer.get_watermark_offsets(tp)
             committed_offsets = consumer.committed([tp])
             current_offset = committed_offsets[0].offset
