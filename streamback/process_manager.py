@@ -193,6 +193,15 @@ class TopicProcessesManager(object):
 
         return memory_usage > max_memory_usage
 
+    def check_max_concurrency_setting(self, num_of_procs):
+        if num_of_procs > 50:
+            log(INFO, "MAX_CONCURRENCY_SETTING_POSSIBLE_MISCONFIG[topic={topic},num_of_procs={num_of_procs}]".format(
+                topic=self.topic,
+                num_of_procs=num_of_procs
+            ))
+            return 50
+        return num_of_procs
+
     def get_needed_concurrency(self):
         streamback = self.process_manager.streamback
         messages_count = streamback.main_stream.get_message_count_in_topic(
@@ -201,11 +210,14 @@ class TopicProcessesManager(object):
 
         for concurrency in self.concurrency_config.scaling:
             messages_threshold = concurrency[0]
-            num_of_procs = concurrency[1]
+            num_of_procs = self.check_max_concurrency_setting(concurrency[1])
+
             if messages_count <= messages_threshold:
                 return messages_count, num_of_procs
 
-        return messages_count, self.concurrency_config.scaling[-1][1]
+        concurrency = self.check_max_concurrency_setting(self.concurrency_config.scaling[-1][1])
+
+        return messages_count, concurrency
 
     def terminate_all(self):
         for topic_process in self.processes:
