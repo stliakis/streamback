@@ -12,7 +12,6 @@ class Listener(object):
     topic = None
     function = None
     input = None
-    concurrency = 1
     retry_strategy = RetryStrategy()
 
     def __init__(self, topic=None, function=None, retry_strategy=None, input=None, concurrency=None):
@@ -20,7 +19,7 @@ class Listener(object):
         self.input = input or self.input
         self.function = function or self.function
         self.retry_strategy = retry_strategy or self.retry_strategy
-        self.concurrency = concurrency or self.concurrency
+        self.concurrency = concurrency
 
     def get_listener_function_valid_arguments(self, func):
         if sys.version_info.major == 2:

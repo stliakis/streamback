@@ -7,7 +7,7 @@ import uuid
 import signal
 import sys
 import psutil
-from .process_manager import ProcessManager, TopicProcessMessages
+from .process_manager import ListenersRunner, TopicProcessMessages
 from .feedback_lane import FeedbackLane
 from .exceptions import InvalidMessageType
 from .context import ConsumerContext
@@ -33,15 +33,17 @@ class Streamback(object):
             rescale_interval=1,
             rescale_min_process_ttl=10,
             rescale_max_memory_mb=None,
+            pool_concurrency=None,
             on_exception=None,
             callbacks=None,
+            extensions=None,
             retry_strategy=None,
             log_level="INFO",
             **kwargs
     ):
         self.initialize_logger(log_level)
 
-        self.callbacks = callbacks or []
+        self.extensions = extensions or callbacks or []
         self.name = name
         self.manager_name = "streamback_manager_%s" % name
         self.feedback_timeout = feedback_timeout
@@ -54,6 +56,7 @@ class Streamback(object):
         self.auto_flush_messages_count = auto_flush_messages_count
         self.rescale_min_process_ttl = rescale_min_process_ttl
         self.rescale_max_memory_mb = rescale_max_memory_mb
+        self.pool_concurrency = pool_concurrency or [[0, 1]]
 
         if streams:
             parsed_streams = ParsedStreams(name, streams)
@@ -70,7 +73,7 @@ class Streamback(object):
             self.main_stream = main_stream
             self.feedback_stream = feedback_stream
 
-        self.listeners = {}
+        self.listeners = []
         self.routers = []
         self.process_manager = None
 
@@ -85,7 +88,7 @@ class Streamback(object):
 
     def get_current_memory_usage(self):
         total_rss = 0
-        for topic_process in self.process_manager.get_topic_processes():
+        for topic_process in self.process_manager.get_processes():
             process = psutil.Process(topic_process.process.pid)
             memory_info = process.memory_info()
             total_rss += memory_info.rss
@@ -125,8 +128,8 @@ class Streamback(object):
         logger.addHandler(console_handler)
 
     def on_fork(self):
-        for callback in self.get_callbacks():
-            callback.on_fork()
+        for extension in self.get_extensions():
+            extension.on_fork()
 
     def get_payload_metadata(self):
         return {"source_group": self.name}
@@ -292,24 +295,24 @@ class Streamback(object):
         for listener in router.listeners:
             self.add_listener(listener)
 
-    def on_message_from_master_process(self, message, topic, listeners):
+    def on_message_from_master_process(self, message, topics, listeners):
         log(INFO, "RECEIVED_MESSAGE_FROM_MASTER_PROCESS[message={message}]".format(message=message))
         if message == TopicProcessMessages.TERMINATE:
-            log(INFO, "LISTENER_PROCESS_KILLED[topic={topic}]".format(topic=topic))
+            log(INFO, "LISTENER_PROCESS_KILLED[topics={topics}]".format(topics=topics))
             self.close(listeners, reason="received terminate from master process")
             sys.exit(0)
 
-    def start_listeners(self, pipe, topic, listeners):
+    def start_listeners(self, pipe, topics, listeners):
         self.listeners = listeners
         self.initialize_streams()
         self.on_fork()
 
         def on_tick():
             if pipe.poll():
-                self.on_message_from_master_process(pipe.recv(), topic, listeners)
+                self.on_message_from_master_process(pipe.recv(), topics, listeners)
 
         for message in self.main_stream.read_stream(
-                streamback=self, topics=[topic], timeout=None, on_tick=on_tick
+                streamback=self, topics=topics, timeout=None, on_tick=on_tick
         ):
             log(
                 DEBUG,
@@ -320,12 +323,15 @@ class Streamback(object):
 
             failed_listeners = []
             for listener in listeners:
+                if listener.topic != message.topic:
+                    continue
+
                 try:
-                    for callback in self.get_callbacks():
-                        callback.on_consume_begin(self, listener, context, message)
+                    for extension in self.get_extensions():
+                        extension.on_consume_begin(self, listener, context, message)
                     listener.try_to_consume(context, message)
-                    for callback in self.get_callbacks():
-                        callback.on_consume_end(self, listener, context, message)
+                    for extension in self.get_extensions():
+                        extension.on_consume_end(self, listener, context, message)
                 except Exception as e:
                     log(
                         ERROR,
@@ -335,8 +341,8 @@ class Streamback(object):
                     )
                     traceback.print_exc()
                     failed_listeners.append([listener, e, context, message])
-                    for callback in self.get_callbacks():
-                        callback.on_consume_end(
+                    for extension in self.get_extensions():
+                        extension.on_consume_end(
                             self, listener, context, message, exception=e
                         )
                 finally:
@@ -356,43 +362,46 @@ class Streamback(object):
                 if self.feedback_stream and message.feedback_topic:
                     self.send_feedback_end(message.feedback_topic)
 
-    def _start_listener(self, pipe, topic, listeners):
+    def _start_listener(self, pipe, topics, listeners):
         def signal_handler(sig, frame):
-            log(INFO, "LISTENER_PROCESS_KILLED[topic={topic}]".format(topic=topic))
+            log(INFO, "LISTENER_PROCESS_KILLED[topics={topics}]".format(topics=topics))
             self.close(listeners, reason="listener process killed")
             sys.exit(0)
 
         signal.signal(signal.SIGTERM, signal_handler)
 
         try:
-            self.start_listeners(pipe, topic, listeners)
+            self.start_listeners(pipe, topics, listeners)
         except KeyboardInterrupt as ex:
             self.close(listeners,
-                       reason="by user")
+                       reason="keyboard kill command")
         except Exception as ex:
             self.close(listeners,
                        reason="exception while starting listeners[exception={exception}]".format(exception=ex))
 
     def start(self):
-        self.process_manager = ProcessManager(self, self.listeners, self._start_listener)
+        self.process_manager = ListenersRunner(self, self.listeners, self._start_listener)
         self.process_manager.spin()
 
-    def get_callbacks(self):
-        return self.callbacks
+    def get_extensions(self):
+        return self.extensions
 
     def consume_exception(self, listener, exception, context, message):
         if self.on_exception:
             self.on_exception(listener, context, message, exception)
-        for callback in self.get_callbacks():
-            callback.on_consume_exception(self, listener, exception, context, message)
+        for extension in self.get_extensions():
+            extension.on_consume_exception(self, listener, exception, context, message)
 
     def add_listener(self, listener):
         listener.topic = self.get_topic_real_name(listener.topic)
-        self.listeners.setdefault(listener.topic, []).append(listener)
+        self.listeners.append(listener)
         return self
 
     def add_callback(self, *callback):
-        self.callbacks.extend(callback)
+        return self.extend(*callback)
+
+    def extend(self, *extension):
+        self.extensions.extend(extension)
         return self
 
     def close(self, listeners, reason=None):

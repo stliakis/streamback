@@ -44,7 +44,7 @@ class Stream(object):
     def close(self):
         raise NotImplementedError
 
-    def get_message_count_in_topic(self, topic):
+    def get_message_count_in_topics(self, topic):
         raise NotImplementedError
 
 
@@ -55,6 +55,7 @@ class KafkaStream(Stream):
         self.group_name = group_name
         self.kafka_consumer = None
         self.kafka_producer = None
+        self.service_kafka_consumer = None
 
     def initialize(
             self,
@@ -152,22 +153,32 @@ class KafkaStream(Stream):
 
         return True
 
-    def get_message_count_in_topic(self, topic):
-        consumer = self.create_kafka_consumer(self.group_name)
-        metadata = consumer.list_topics(topic, timeout=10)
-        partitions = metadata.topics[topic].partitions
+    def get_or_create_service_consumer(self):
+        if not self.service_kafka_consumer:
+            self.service_kafka_consumer = self.create_kafka_consumer(self.group_name)
 
-        if not partitions:
-            log(WARNING, "NO_PARTITIONS_FOR_TOPIC[topic={topic}]".format(topic=topic))
+        return self.service_kafka_consumer
+
+    def get_message_count_in_topics(self, topics):
+        consumer = self.get_or_create_service_consumer()
 
         total_unread_messages = 0
-        for partition_id in partitions:
-            tp = TopicPartition(topic, partition_id)
-            low, high = consumer.get_watermark_offsets(tp)
-            committed_offsets = consumer.committed([tp])
-            current_offset = committed_offsets[0].offset
-            unread_messages = high - current_offset
-            total_unread_messages += unread_messages
+
+        for topic in topics:
+            metadata = consumer.list_topics(topic, timeout=10)
+            partitions = metadata.topics[topic].partitions
+
+            if not partitions:
+                continue
+                # log(WARNING, "NO_PARTITIONS_FOR_TOPIC[topic={topic}]".format(topic=topic))
+
+            for partition_id in partitions:
+                tp = TopicPartition(topic, partition_id)
+                low, high = consumer.get_watermark_offsets(tp)
+                committed_offsets = consumer.committed([tp])
+                current_offset = committed_offsets[0].offset
+                unread_messages = high - current_offset
+                total_unread_messages += unread_messages
 
         return total_unread_messages
 
