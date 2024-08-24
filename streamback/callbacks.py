@@ -12,5 +12,5 @@ class Callback(object):
     def on_fork(self):
         pass
 
-    def on_master_tick(self, process_manager):
+    def on_master_tick(self, streamback):
         pass

@@ -14,7 +14,7 @@ class ListenerStats(Callback):
         self.interval = interval
         self.last_tick = None
 
-    def on_master_tick(self, process_manager):
+    def on_master_tick(self, streamback):
         if not self.last_tick:
             self.last_tick = time.time()
         else:
@@ -24,7 +24,7 @@ class ListenerStats(Callback):
         total_rss, total_vms = 0, 0
 
         memory_per_topic = {}
-        for topic_process in process_manager.get_processes():
+        for topic_process in streamback.process_manager.get_processes():
             if not topic_process.is_process_alive():
                 log(INFO, "PROCESS_IS_DEAD[topic={topic}]".format(topic=topic_process.topics))
                 continue

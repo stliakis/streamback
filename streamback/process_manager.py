@@ -117,24 +117,6 @@ class ListenersRunner(object):
 
         signal.signal(signal.SIGTERM, signal_handler)
 
-        try:
-            while True:
-                self.on_tick()
-
-                for extension in self.streamback.get_extensions():
-                    try:
-                        extension.on_master_tick(self)
-                    except Exception as ex:
-                        log(
-                            ERROR,
-                            "EXTENSION_ERROR[extension={extension},exception={exception}]".format(
-                                extension=extension, exception=ex
-                            ),
-                        )
-                time.sleep(0.1)
-        except KeyboardInterrupt:
-            pass
-
     def spawn_processes(self):
         log(
             INFO,

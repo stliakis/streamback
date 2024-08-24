@@ -174,13 +174,17 @@ streamback = Streamback(
     streams="main=kafka://kafka:9092&feedback=redis://redis:6379"
 )
 
-
-@streamback.listen("test_hello", concurrency=2)  ## spawns 2 processes for this listener
+@streamback.listen("test_hello") ## adds this listener to the pool of listeners
 def test_hello(context, message):
     print("received: {value}".format(value=message.value))
 
 
-@streamback.listen("test_hello_2", concurrency=20)  ## spawns 20 processes for this listener
+@streamback.listen("test_hello", concurrency=2)  ## spawns 2 dedicated processes for this listener
+def test_hello(context, message):
+    print("received: {value}".format(value=message.value))
+
+
+@streamback.listen("test_hello_2", concurrency=20)  ## spawns 20 dedicated processes for this listener
 def test_hello_2(context, message):
     print("received: {value}".format(value=message.value))
 
@@ -188,14 +192,32 @@ def test_hello_2(context, message):
 streamback.start()
 ```
 
-## SASL Authentication
+## Scheduling of messages(cron like)
+
+You can schedule messages to be sent on periodic intervals
 
 ```python
-streamback = Streamback(
-    "example_producer_app",
-    streams="main=kafka://user@1234:kafka:9092&feedback=redis://redis:6379"
+
+@streamback.listen("check_server_status")
+def hello(context, message):
+  print("received: {value}".format(value=message.value))
+
+
+streamback.schedule(
+  "check_the_server_status",
+  when="*/30 * * * * *",  ## this will execute every 30 seconds
+  then="check_server_status",
+  args={
+    "something1": "hello there",
+  },
+  description="test the schedule blabla bla"
 )
+
+streamback.start()
+
 ```
+
+
 
 ## Consumer input mapping to objects
 
@@ -250,7 +272,7 @@ def test_input(arg1, arg2):
 streamback.send("test_input", {"arg1": "Hello world!", "arg2": "Hello world!"})
 ```
 
-### Class based consumers
+## Class based consumers
 
 ```python
 @streamback.listen("new_log")
@@ -384,3 +406,13 @@ streamback = Streamback(
 Streamback has been created for usage in car.gr's systems which has some legacy python 2.7 services. We are are planing
 to move Streamback to python >3.7 in some later version but for now the python 2.7 support was crucial and thus the
 async/await support was sacrificed. Currently it is used in production to handle millions of messages per day.
+
+
+## SASL Authentication
+
+```python
+streamback = Streamback(
+    "example_producer_app",
+    streams="main=kafka://user@1234:kafka:9092&feedback=redis://redis:6379"
+)
+```

@@ -15,14 +15,14 @@ class AutoRestart(Callback):
         self.last_tick = None
         self.check_interval = check_interval
 
-    def on_master_tick(self, process_manager):
+    def on_master_tick(self, streamback):
         if not self.last_tick:
             self.last_tick = time.time()
         else:
             if time.time() - self.last_tick < self.check_interval:
                 return
 
-        for listeners_process in process_manager.get_processes():
+        for listeners_process in streamback.process_manager.get_processes():
             if self.max_seconds:
                 if listeners_process.spawn_time < time.time() - self.max_seconds:
                     log(INFO,

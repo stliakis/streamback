@@ -7,6 +7,8 @@ import uuid
 import signal
 import sys
 import psutil
+
+from .scheduler import Scheduler, SchedulerState
 from .process_manager import ListenersRunner, TopicProcessMessages
 from .feedback_lane import FeedbackLane
 from .exceptions import InvalidMessageType
@@ -38,6 +40,8 @@ class Streamback(object):
             callbacks=None,
             extensions=None,
             retry_strategy=None,
+            scheduler_state_file="streamback_scheduler_state.json",
+            scheduler_keep_state_ttl=3600,
             log_level="INFO",
             **kwargs
     ):
@@ -57,6 +61,12 @@ class Streamback(object):
         self.rescale_min_process_ttl = rescale_min_process_ttl
         self.rescale_max_memory_mb = rescale_max_memory_mb
         self.pool_concurrency = pool_concurrency or [[0, 1]]
+        self.scheduler = Scheduler(
+            state=SchedulerState(
+                filepath=scheduler_state_file,
+                state_ttl=scheduler_keep_state_ttl
+            )
+        )
 
         if streams:
             parsed_streams = ParsedStreams(name, streams)
@@ -380,8 +390,34 @@ class Streamback(object):
                        reason="exception while starting listeners[exception={exception}]".format(exception=ex))
 
     def start(self):
+        self.start_listeners_runner()
+        self.start_scheduler()
+
+        try:
+            while True:
+                self.process_manager.on_tick()
+                self.scheduler.execute(self)
+
+                for extension in self.get_extensions():
+                    try:
+                        extension.on_master_tick(self)
+                    except Exception as ex:
+                        log(
+                            ERROR,
+                            "EXTENSION_ERROR[extension={extension},exception={exception}]".format(
+                                extension=extension, exception=ex
+                            ),
+                        )
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            pass
+
+    def start_listeners_runner(self):
         self.process_manager = ListenersRunner(self, self.listeners, self._start_listener)
         self.process_manager.spin()
+
+    def start_scheduler(self):
+        log(INFO, "STREAMBACK_SCHEDULER_STARTING[tasks=[{tasks}]]".format(tasks=self.scheduler.tasks))
 
     def get_extensions(self):
         return self.extensions
@@ -403,6 +439,15 @@ class Streamback(object):
     def extend(self, *extension):
         self.extensions.extend(extension)
         return self
+
+    def schedule(self, name, when, then, args=None, description=None):
+        self.scheduler.add_task(
+            name=name,
+            when=when,
+            then=then,
+            args=args,
+            description=description
+        )
 
     def close(self, listeners, reason=None):
         for listener in listeners:
