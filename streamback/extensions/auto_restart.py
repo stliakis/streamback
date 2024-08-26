@@ -27,7 +27,7 @@ class AutoRestart(Callback):
                 if listeners_process.spawn_time < time.time() - self.max_seconds:
                     log(INFO,
                         "RESTARTING_PROCESS[topics={topics},reason=reached {restart_after_seconds} seconds lifetime]".format(
-                            topic=listeners_process.topics, restart_after_seconds=self.max_seconds))
+                            topics=listeners_process.topics, restart_after_seconds=self.max_seconds))
                     listeners_process.send_message(TopicProcessMessages.TERMINATE)
 
             if self.max_memory_mb:
