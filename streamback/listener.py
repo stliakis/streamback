@@ -4,22 +4,26 @@ from logging import INFO
 
 import inspect
 
-from .utils import log
+from .utils import log, listify
 from .retry_strategy import RetryStrategy
 
 
 class Listener(object):
-    topic = None
     function = None
     input = None
     retry_strategy = RetryStrategy()
 
     def __init__(self, topic=None, function=None, retry_strategy=None, input=None, concurrency=None):
-        self.topic = topic or self.topic
+        self.topics = listify(topic or self.topic)
+
         self.input = input or self.input
         self.function = function or self.function
         self.retry_strategy = retry_strategy or self.retry_strategy
         self.concurrency = concurrency
+
+    @property
+    def topic(self):
+        return self.topics[0]
 
     def get_listener_function_valid_arguments(self, func):
         if sys.version_info.major == 2:
@@ -89,6 +93,6 @@ class Listener(object):
 
     def __repr__(self):
         if self.function:
-            return "Listener[topic=%s,function=%s]" % (self.topic, self.function.__name__)
+            return "Listener[topics=%s,function=%s]" % (self.topics, self.function.__name__)
         else:
-            return "Listener[topic=%s,name=%s]" % (self.topic, self.__class__.__name__)
+            return "Listener[topics=%s,name=%s]" % (self.topics, self.__class__.__name__)

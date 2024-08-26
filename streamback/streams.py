@@ -56,6 +56,7 @@ class KafkaStream(Stream):
         self.kafka_consumer = None
         self.kafka_producer = None
         self.service_kafka_consumer = None
+        self.closed = False
 
     def initialize(
             self,
@@ -69,6 +70,7 @@ class KafkaStream(Stream):
         self.initialized = True
 
     def close(self):
+        self.closed = True
         if self.kafka_producer:
             self.kafka_producer.flush()
         if self.kafka_consumer:
@@ -102,7 +104,7 @@ class KafkaStream(Stream):
         config = {
             "bootstrap.servers": ",".join(self.kafka_hosts),
             "group.id": group_name or self.group_name,
-            "max.partition.fetch.bytes": 16,
+            "max.partition.fetch.bytes": 128,
             "auto.offset.reset": "earliest",
             "fetch.min.bytes": 1,
             "enable.auto.commit": False,
@@ -184,7 +186,7 @@ class KafkaStream(Stream):
 
     def read_stream(self, streamback, topics, timeout=None, on_tick=None):
         consumer = self.kafka_consumer
-        consumer.subscribe(topics)
+
         begin = time.time()
 
         log(
@@ -192,42 +194,43 @@ class KafkaStream(Stream):
             "MAIN_STREAM_LISTENING[topics={topics}]".format(topics=topics),
         )
 
-        while True:
+        consumer.subscribe(topics)
+
+        while self.closed is False:
             if on_tick:
                 on_tick()
 
-            msg = consumer.poll(0.05)
+            messages = consumer.consume(100, 0.05)
 
-            if timeout:
-                time_since_begin = time.time() - begin
-                if time_since_begin > timeout:
-                    return
+            for msg in messages:
+                if timeout:
+                    time_since_begin = time.time() - begin
+                    if time_since_begin > timeout:
+                        return
 
-            if not msg:
-                continue
+                if not msg:
+                    continue
 
-            if msg.error():
-                error_code = msg.error().code()
-                if error_code == KafkaError.UNKNOWN_TOPIC_OR_PART:
-                    log(ERROR, "Topic {} does not exist".format(msg.topic()))
-                elif msg.error():
-                    raise KafkaException(msg.error())
-            else:
-                payload = self.deserialize_payload(msg.value())
+                if msg.error():
+                    error_code = msg.error().code()
+                    if error_code == KafkaError.UNKNOWN_TOPIC_OR_PART:
+                        log(ERROR, "Topic {} does not exist".format(msg.topic()))
+                    elif msg.error():
+                        raise KafkaException(msg.error())
+                else:
+                    payload = self.deserialize_payload(msg.value())
 
-                message = KafkaMessage(
-                    kafka_message=msg,
-                    streamback=streamback,
-                    topic=msg.topic(),
-                    payload=payload,
-                    key=msg.key(),
-                )
+                    message = KafkaMessage(
+                        kafka_message=msg,
+                        streamback=streamback,
+                        topic=msg.topic(),
+                        payload=payload,
+                        key=msg.key(),
+                    )
 
-                message.ack = lambda: consumer.commit(msg)
+                    message.ack = lambda: consumer.commit(msg)
 
-                yield message
-
-        consumer.close()
+                    yield message
 
 
 class RedisStream(Stream):

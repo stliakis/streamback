@@ -333,7 +333,7 @@ class Streamback(object):
 
             failed_listeners = []
             for listener in listeners:
-                if listener.topic != message.topic:
+                if message.topic not in listener.topics:
                     continue
 
                 try:
@@ -429,7 +429,7 @@ class Streamback(object):
             extension.on_consume_exception(self, listener, exception, context, message)
 
     def add_listener(self, listener):
-        listener.topic = self.get_topic_real_name(listener.topic)
+        listener.topics = [self.get_topic_real_name(topic) for topic in listener.topics]
         self.listeners.append(listener)
         return self
 

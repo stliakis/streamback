@@ -164,7 +164,11 @@ class ListenersProcessesManager(object):
 
     @property
     def topics(self):
-        return list(set([listener.topic for listener in self.listeners]))
+        all_topics = set()
+        for listener in self.listeners:
+            all_topics.update(listener.topics)
+
+        return list(all_topics)
 
     def spawn(self):
         try:
@@ -317,7 +321,13 @@ class ListenersProcess(object):
 
     def __init__(self, listeners, target):
         self.listeners = listeners
-        self.topics = list(set([i.topic for i in listeners]))
+
+        all_topics = set()
+        for listener in listeners:
+            all_topics.update(listener.topics)
+
+        self.topics = list(all_topics)
+
         self.target = lambda *args, **kwargs: target(*args, **kwargs)
 
     def spawn(self):
