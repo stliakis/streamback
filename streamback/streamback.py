@@ -440,7 +440,7 @@ class Streamback(object):
         self.extensions.extend(extension)
         return self
 
-    def schedule(self, name, when, then, args=None, description=None):
+    def schedule(self, when, then, args=None, name=None, description=None):
         self.scheduler.add_task(
             name=name,
             when=when,

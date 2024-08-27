@@ -12,7 +12,9 @@ class Scheduler(object):
         self.tasks = []
         self.state = state
 
-    def add_task(self, name, when, then, args=None, description=None):
+    def add_task(self, when, then, args=None, name=None, description=None):
+        name = name or "{then}_{args}".format(then=then, args=str(args or {}))
+
         self.tasks.append(SchedulerTask(
             name=name,
             cron_checker=CronChecker(name, pattern=when, state=self.state),
@@ -28,7 +30,7 @@ class Scheduler(object):
 
 
 class SchedulerTask(object):
-    def __init__(self, name, cron_checker, then, args=None, description=None):
+    def __init__(self, cron_checker, then, args=None, name=None, description=None):
         self.name = name
         self.then = then
         self.args = args or {}
