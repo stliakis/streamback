@@ -196,8 +196,6 @@ class Streamback(object):
             }
         )
 
-        payload["value"] = self.check_message_value_type(payload["value"])
-
         payload.update(self.get_payload_metadata())
 
         begin = time.time()
@@ -237,8 +235,6 @@ class Streamback(object):
             return
 
         payload = payload or {"value": value}
-
-        payload["value"] = self.check_message_value_type(payload.get("value"))
 
         payload.update({"event": Events.FEEDBACK_MESSAGE, "source_group": self.name})
 
