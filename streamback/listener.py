@@ -49,7 +49,7 @@ class Listener(object):
             )
 
             if not isinstance(e, tuple(self.retry_strategy.retry_on_exceptions)):
-                raise e
+                raise
 
             if self.retry_strategy.retry_times > 0:
                 if retry_times >= self.retry_strategy.retry_times:
@@ -59,7 +59,7 @@ class Listener(object):
                             message=message, retry_times=retry_times
                         ),
                     )
-                    raise e
+                    raise
                 else:
                     if self.retry_strategy.retry_interval:
                         time.sleep(self.retry_strategy.retry_interval)
@@ -71,7 +71,7 @@ class Listener(object):
                     )
                     self.try_to_consume(context, message, retry_times=retry_times + 1)
             else:
-                raise e
+                raise
 
     def consume(self, context, message):
         if self.function:
