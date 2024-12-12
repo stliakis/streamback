@@ -8,6 +8,7 @@ import signal
 import sys
 import psutil
 
+from .futures.runner import FutureRunner
 from .scheduler import Scheduler, SchedulerState
 from .process_manager import ListenersRunner, TopicProcessMessages
 from .feedback_lane import FeedbackLane
@@ -21,29 +22,31 @@ from .utils import log
 
 class Streamback(object):
     def __init__(
-            self,
-            name,
-            streams=None,
-            topics=None,
-            topics_prefix=None,
-            main_stream=None,
-            feedback_stream=None,
-            feedback_timeout=60,
-            feedback_ttl=300,
-            main_stream_timeout=5,
-            auto_flush_messages_count=200,
-            rescale_interval=1,
-            rescale_min_process_ttl=10,
-            rescale_max_memory_mb=None,
-            pool_concurrency=None,
-            on_exception=None,
-            callbacks=None,
-            extensions=None,
-            retry_strategy=None,
-            scheduler_state_file="streamback_scheduler_state.json",
-            scheduler_keep_state_ttl=3600,
-            log_level="INFO",
-            **kwargs
+        self,
+        name,
+        streams=None,
+        topics=None,
+        topics_prefix=None,
+        main_stream=None,
+        feedback_stream=None,
+        feedback_timeout=60,
+        feedback_ttl=300,
+        main_stream_timeout=5,
+        auto_flush_messages_count=200,
+        rescale_interval=1,
+        rescale_min_process_ttl=10,
+        rescale_max_memory_mb=None,
+        pool_concurrency=None,
+        on_exception=None,
+        callbacks=None,
+        extensions=None,
+        retry_strategy=None,
+        scheduler_state_file="streamback_scheduler_state.json",
+        scheduler_keep_state_ttl=3600,
+        futures_concurrency=0,
+        futures_version=1,
+        log_level="INFO",
+        **kwargs
     ):
         self.initialize_logger(log_level)
 
@@ -60,11 +63,12 @@ class Streamback(object):
         self.auto_flush_messages_count = auto_flush_messages_count
         self.rescale_min_process_ttl = rescale_min_process_ttl
         self.rescale_max_memory_mb = rescale_max_memory_mb
+        self.futures_version = futures_version
+        self.futures_concurrency = futures_concurrency
         self.pool_concurrency = pool_concurrency or [[0, 1]]
         self.scheduler = Scheduler(
             state=SchedulerState(
-                filepath=scheduler_state_file,
-                state_ttl=scheduler_keep_state_ttl
+                filepath=scheduler_state_file, state_ttl=scheduler_keep_state_ttl
             )
         )
 
@@ -77,7 +81,9 @@ class Streamback(object):
                 self.name = parsed_streams.group_name
                 log(
                     WARNING,
-                    "STREAMBACK_GROUP_NAME_OVERRIDE[name={name}]".format(name=self.name),
+                    "STREAMBACK_GROUP_NAME_OVERRIDE[name={name}]".format(
+                        name=self.name
+                    ),
                 )
         else:
             self.main_stream = main_stream
@@ -87,13 +93,15 @@ class Streamback(object):
         self.routers = []
         self.process_manager = None
 
-        self.listen_only_for_topics = [self.get_topic_real_name(topic) for topic in topics or []]
+        self.listen_only_for_topics = [
+            self.get_topic_real_name(topic) for topic in topics or []
+        ]
 
     def initialize_main_stream(self):
         if self.main_stream and not self.main_stream.is_initialized():
             self.main_stream.initialize(
                 flush_timeout=self.main_stream_timeout,
-                auto_flush_messages_count=self.auto_flush_messages_count
+                auto_flush_messages_count=self.auto_flush_messages_count,
             )
 
     def get_current_memory_usage(self):
@@ -171,13 +179,13 @@ class Streamback(object):
         return value
 
     def send(
-            self,
-            topic,
-            value=None,
-            payload=None,
-            key=None,
-            event=Events.MAIN_STREAM_MESSAGE,
-            flush=False,
+        self,
+        topic,
+        value=None,
+        payload=None,
+        key=None,
+        event=Events.MAIN_STREAM_MESSAGE,
+        flush=False,
     ):
         self.initialize_streams()
 
@@ -273,8 +281,10 @@ class Streamback(object):
             if inspect.isclass(func) and issubclass(func, Listener):
                 listener_class = func
                 listener = listener_class(
-                    topic=topic, retry_strategy=retry or self.default_retry_strategy, input=input,
-                    concurrency=concurrency
+                    topic=topic,
+                    retry_strategy=retry or self.default_retry_strategy,
+                    input=input,
+                    concurrency=concurrency,
                 )
                 self.add_listener(listener)
             else:
@@ -284,8 +294,11 @@ class Streamback(object):
                     )
                 self.add_listener(
                     Listener(
-                        topic=topic, function=func, retry_strategy=retry or self.default_retry_strategy, input=input,
-                        concurrency=concurrency
+                        topic=topic,
+                        function=func,
+                        retry_strategy=retry or self.default_retry_strategy,
+                        input=input,
+                        concurrency=concurrency,
                     )
                 )
 
@@ -302,7 +315,12 @@ class Streamback(object):
             self.add_listener(listener)
 
     def on_message_from_master_process(self, message, topics, listeners):
-        log(INFO, "RECEIVED_MESSAGE_FROM_MASTER_PROCESS[message={message}]".format(message=message))
+        log(
+            INFO,
+            "RECEIVED_MESSAGE_FROM_MASTER_PROCESS[message={message}]".format(
+                message=message
+            ),
+        )
         if message == TopicProcessMessages.TERMINATE:
             log(INFO, "LISTENER_PROCESS_KILLED[topics={topics}]".format(topics=topics))
             self.close(listeners, reason="received terminate from master process")
@@ -318,7 +336,7 @@ class Streamback(object):
                 self.on_message_from_master_process(pipe.recv(), topics, listeners)
 
         for message in self.main_stream.read_stream(
-                streamback=self, topics=topics, timeout=None, on_tick=on_tick
+            streamback=self, topics=topics, timeout=None, on_tick=on_tick
         ):
             log(
                 DEBUG,
@@ -379,13 +397,28 @@ class Streamback(object):
         try:
             self.start_listeners(pipe, topics, listeners)
         except KeyboardInterrupt as ex:
-            self.close(listeners,
-                       reason="keyboard kill command")
+            self.close(listeners, reason="keyboard kill command")
         except Exception as ex:
-            self.close(listeners,
-                       reason="exception while starting listeners[exception={exception}]".format(exception=ex))
+            self.close(
+                listeners,
+                reason="exception while starting listeners[exception={exception}]".format(
+                    exception=ex
+                ),
+            )
+
+    def register_futures_listener(self):
+        def streamback_futures_listener(context, message):
+            message.respond(FutureRunner().run(**message.value))
+
+        self.listen(
+            "streamback.futures.v%s" % self.futures_version,
+            concurrency=[[0, self.futures_concurrency]],
+        )(streamback_futures_listener)
 
     def start(self):
+        if self.futures_concurrency > 0:
+            self.register_futures_listener()
+
         self.start_listeners_runner()
         self.start_scheduler()
 
@@ -409,11 +442,18 @@ class Streamback(object):
             pass
 
     def start_listeners_runner(self):
-        self.process_manager = ListenersRunner(self, self.listeners, self._start_listener)
+        self.process_manager = ListenersRunner(
+            self, self.listeners, self._start_listener
+        )
         self.process_manager.spin()
 
     def start_scheduler(self):
-        log(INFO, "STREAMBACK_SCHEDULER_STARTING[tasks=[{tasks}]]".format(tasks=self.scheduler.tasks))
+        log(
+            INFO,
+            "STREAMBACK_SCHEDULER_STARTING[tasks=[{tasks}]]".format(
+                tasks=self.scheduler.tasks
+            ),
+        )
 
     def get_extensions(self):
         return self.extensions
@@ -438,16 +478,14 @@ class Streamback(object):
 
     def schedule(self, when, then, args=None, name=None, description=None):
         self.scheduler.add_task(
-            name=name,
-            when=when,
-            then=then,
-            args=args,
-            description=description
+            name=name, when=when, then=then, args=args, description=description
         )
 
     def close(self, listeners, reason=None):
         for listener in listeners:
-            log(INFO, "FLUSHING_LISTENER[listener={listener}]".format(listener=listener))
+            log(
+                INFO, "FLUSHING_LISTENER[listener={listener}]".format(listener=listener)
+            )
             listener.flush()
 
         if self.feedback_stream and self.feedback_stream.is_initialized():

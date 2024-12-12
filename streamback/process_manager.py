@@ -80,7 +80,7 @@ class ListenersRunner(object):
                     concurrency = []
 
                     for index, i in enumerate(
-                            range(min_concurrency, max_concurrency + 1)
+                        range(min_concurrency, max_concurrency + 1)
                     ):
                         concurrency.append([index * 1000, i])
 
@@ -171,19 +171,19 @@ class ListenersProcessesManager(object):
         return list(all_topics)
 
     def spawn(self):
-        try:
-            memory_usage = self.process_manager.streamback.get_current_memory_usage()
-            messages_count, needed_number_of_processes = self.get_needed_concurrency()
-            current_number_of_processes = len(self.processes)
-            processes_rescale_number = (
-                    needed_number_of_processes - current_number_of_processes
-            )
-        except Exception as ex:
-            log(
-                ERROR,
-                "COULD_NOT_SPAWN_PROCESSES[exception={exception}]".format(exception=ex),
-            )
-            return
+        # try:
+        memory_usage = self.process_manager.streamback.get_current_memory_usage()
+        messages_count, needed_number_of_processes = self.get_needed_concurrency()
+        current_number_of_processes = len(self.processes)
+        processes_rescale_number = (
+            needed_number_of_processes - current_number_of_processes
+        )
+        # except Exception as ex:
+        #     log(
+        #         ERROR,
+        #         "COULD_NOT_SPAWN_PROCESSES[exception={exception}]".format(exception=ex),
+        #     )
+        #     return
 
         # if needed_processes_number != 0:
         log(
@@ -226,8 +226,8 @@ class ListenersProcessesManager(object):
             for i in range(abs(processes_rescale_number)):
                 process = self.processes.pop()
                 if (
-                        process.get_seconds_alive()
-                        > self.process_manager.streamback.rescale_min_process_ttl
+                    process.get_seconds_alive()
+                    > self.process_manager.streamback.rescale_min_process_ttl
                 ):
                     process.terminate()
                     log(
@@ -244,8 +244,8 @@ class ListenersProcessesManager(object):
             process.on_master_tick()
 
         if (
-                time.time() - self.last_rescale_time
-                > self.process_manager.streamback.rescale_interval
+            time.time() - self.last_rescale_time
+            > self.process_manager.streamback.rescale_interval
         ):
             self.spawn()
             self.last_rescale_time = time.time()

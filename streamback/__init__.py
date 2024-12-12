@@ -7,6 +7,8 @@ from .listener import Listener
 from .callbacks import Callback
 from .extensions.stats import ListenerStats
 from .extensions.auto_restart import AutoRestart
+from .futures.future import Future
+from .futures.serializers import Serializer, GenericSerializer, PickleSerializer
 
 __all__ = [
     "Streamback",
@@ -18,5 +20,9 @@ __all__ = [
     "FeedbackError",
     "Callback",
     "ListenerStats",
-    "AutoRestart"
+    "AutoRestart",
+    "Future",
+    "Serializer",
+    "GenericSerializer",
+    "PickleSerializer",
 ]

@@ -59,9 +59,9 @@ class KafkaStream(Stream):
         self.closed = False
 
     def initialize(
-            self,
-            flush_timeout=None,
-            auto_flush_messages_count=None,
+        self,
+        flush_timeout=None,
+        auto_flush_messages_count=None,
     ):
         self.kafka_producer = self.create_kafka_producer()
         self.kafka_consumer = self.create_kafka_consumer()
@@ -91,7 +91,7 @@ class KafkaStream(Stream):
             "batch.size": 32768,
             "linger.ms": 1,
             "acks": 1,
-            "queue.buffering.max.messages": 100000
+            "queue.buffering.max.messages": 100000,
         }
 
         config = self.extend_config_with_authentication(config)
@@ -132,8 +132,8 @@ class KafkaStream(Stream):
         if flush:
             self.flush()
         elif (
-                self.auto_flush_messages_count
-                and queue_size >= self.auto_flush_messages_count
+            self.auto_flush_messages_count
+            and queue_size >= self.auto_flush_messages_count
         ):
             self.flush()
 
@@ -240,10 +240,7 @@ class RedisStream(Stream):
         self.redis_client = None
 
     def initialize(
-            self,
-            flush_timeout=5,
-            auto_flush_messages_count=None,
-            authentication=None
+        self, flush_timeout=5, auto_flush_messages_count=None, authentication=None
     ):
         self.flush_timeout = flush_timeout
         self.authentication = authentication
@@ -253,6 +250,16 @@ class RedisStream(Stream):
             password=None,
         )
         self.initialized = True
+
+    def get_message_count_in_topics(self, topics):
+        if not self.redis_client:
+            self.initialize()
+
+        total = 0
+        for topic in topics:
+            total += self.redis_client.llen(topic)
+
+        return total
 
     def send(self, topic, payload, key=None, flush=None):
         self.redis_client.lpush(topic, self.serialize_payload(payload))
@@ -282,7 +289,7 @@ class RedisStream(Stream):
             yield message
 
     def flush(self):
-        pass
+        return True
 
     def close(self):
         if self.redis_client:
@@ -331,7 +338,9 @@ class ParsedStreams(object):
                     else:
                         authentication = None
 
-                    stream = KafkaStream(self.group_name, value, authentication=authentication)
+                    stream = KafkaStream(
+                        self.group_name, value, authentication=authentication
+                    )
                 elif protocol == "redis":
                     stream = RedisStream(self.group_name, value)
 
