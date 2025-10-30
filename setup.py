@@ -15,10 +15,10 @@ else:
 
 setup(
     name="streamback",
-    version="0.5.0",
+    version="0.5.1",
     author='Stefanos Liakis',
     author_email='stliakis@gmail.com',
-    description="Two way streams for your microservices",
+    description="Two way streams for your services",
     long_description=long_description,
     long_description_content_type='text/markdown',
     packages=find_packages(),

@@ -213,7 +213,8 @@ class ListenersProcessesManager(object):
                 return
 
             for i in range(processes_rescale_number):
-                process = ListenersProcess(self.listeners, self.target)
+                process_index = len(self.processes)
+                process = ListenersProcess(self.listeners, self.target, process_index=process_index)
                 self.processes.append(process)
                 process.spawn()
                 log(
@@ -319,8 +320,9 @@ class ListenersProcess(object):
     spawn_time = None
     terminated = False
 
-    def __init__(self, listeners, target):
+    def __init__(self, listeners, target, process_index=None):
         self.listeners = listeners
+        self.process_index = process_index
 
         all_topics = set()
         for listener in listeners:
@@ -342,6 +344,7 @@ class ListenersProcess(object):
                 child_pipe,
                 self.topics,
                 self.listeners,
+                self.process_index,
             ),
         )
         self.process.start()
