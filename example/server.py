@@ -5,7 +5,16 @@ import time
 
 from streamback.extensions.auto_restart import AutoRestart
 from streamback.retry_strategy import RetryStrategy
-from streamback import Streamback, KafkaStream, RedisStream, Listener, Callback, ListenerStats, Router
+from streamback import (
+    Streamback,
+    KafkaStream,
+    RedisStream,
+    Listener,
+    Callback,
+    ListenerStats,
+    Router,
+    Future,
+)
 
 
 def on_exception(listener, context, message, exception):
@@ -35,8 +44,31 @@ streamback = Streamback(
     streams="main=kafka://kafka:9092&feedback=redis://redis:6379&topics_prefix=stefanos-dev-topics",
     on_exception=on_exception,
     log_level="DEBUG",
-    rescale_max_memory_mb=1000
-).add_callback(StreambackCallbacks(), ListenerStats(5), AutoRestart(max_seconds=1000, max_memory_mb=100))
+    futures_concurrency=1,
+    rescale_max_memory_mb=1000,
+    # group_instance_id="main_app_{counter}",
+    # topics=["new_log"]
+).extend(
+    StreambackCallbacks(),
+    ListenerStats(5),
+    AutoRestart(max_seconds=1000, max_memory_mb=100),
+)
+
+# from streamback import Future
+
+
+# class TestClass(object):
+#     @property
+#     def future(self):
+#         # type: () -> TestClass
+#         return Future(self, streamback)
+
+#     def test_method(self):
+#         print("test_method")
+#         return "test_method"
+
+
+# streamback.start()
 
 
 # #
@@ -90,42 +122,46 @@ streamback = Streamback(
 #     message.respond({"message": "hello back"})
 #
 # #
-router = Router()
+# router = Router()
 
 
-
-@router.listen("new_log3", concurrency=[[10, 2], [20, 4], [40000, 5], [50000, 7]])
-class LogsConsumer(Listener):
-    logs = []
-
-    def consume(self, context, message):
-        print("consume")
-        pass
-        # self.logs.append(message.value)
-        # if len(self.logs) > 100:
-        #     self.flush()
-        # time.sleep(0.5)
-
-    # def flush(self):
-    #     print("flush called")
-    #     time.sleep(10)
-    #     print("flushed///")
-    #     pass
-    #     database_commit(self.logs)
-
-
-
-streamback.include_router(router)
-
-@streamback.listen("new_log", concurrency=[0, 10])
-# @streamback.listen("new_log", concurrency=[[0, 0], [10, 10]])
-def test_receiver2(message):
-    time.sleep(0.1)
-    # print("test_receiver2:", message)
-
-@streamback.listen("new_log2", concurrency=1)
-# @streamback.listen("new_log", concurrency=[[0, 0], [10, 10]])
-def test_receiver2(message):
-    time.sleep(0.1)
+# @router.listen("new_log3", concurrency=[[10, 2], [20, 4], [40000, 5], [50000, 7]])
+# class LogsConsumer(Listener):
+#     logs = []
 #
+#     def consume(self, context, message):
+#         print("consume")
+#         pass
+#         # self.logs.append(message.value)
+#         # if len(self.logs) > 100:
+#         #     self.flush()
+#         # time.sleep(0.5)
+#
+#     # def flush(self):
+#     #     print("flush called")
+#     #     time.sleep(10)
+#     #     print("flushed///")
+#     #     pass
+#     #     database_commit(self.logs)
+#
+#
+# streamback.include_router(router)
+
+
+# @streamback.listen("new_log")
+# @streamback.listen("new_log", concurrency=5)
+# def test_receiver(message):
+#     print("test_receiver:", message)
+#     time.sleep(0.1)
+
+
+#
+@streamback.listen("new_log2",concurrency=[[0, 0], [10, 10]])
+def test_receiver2(message):
+    time.sleep(0.1)
+    print("test_receiver2:", message)
+
+
+# streamback.schedule(when="* * * * * *", then="new_log", args={"asdasd": "asdsad"})
+
 streamback.start()

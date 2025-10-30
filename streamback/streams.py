@@ -56,13 +56,19 @@ class KafkaStream(Stream):
         self.kafka_consumer = None
         self.kafka_producer = None
         self.service_kafka_consumer = None
+        self.group_instance_id = None
         self.closed = False
 
     def initialize(
         self,
         flush_timeout=None,
         auto_flush_messages_count=None,
+        group_instance_id=None,
     ):
+        # set before creating consumer so it is applied in config
+        if group_instance_id is not None:
+            self.group_instance_id = group_instance_id
+
         self.kafka_producer = self.create_kafka_producer()
         self.kafka_consumer = self.create_kafka_consumer()
         self.flush_timeout = flush_timeout
@@ -109,6 +115,10 @@ class KafkaStream(Stream):
             "fetch.min.bytes": 1,
             "enable.auto.commit": False,
         }
+
+        if getattr(self, "group_instance_id", None):
+            config["group.instance.id"] = self.group_instance_id
+            log(INFO, "KAFKA_CONSUMER_CONFIG[GROUP_INSTANCE_ID={group_instance_id}]".format(group_instance_id=self.group_instance_id))
 
         config = self.extend_config_with_authentication(config)
 

@@ -4,54 +4,38 @@ import time
 
 from streamback import Streamback, KafkaStream, RedisStream
 
-#
-# streamback = Streamback(
-#     "logs",
-#     main_stream=KafkaStream(["kafka:9092"]),
-#     feedback_stream=RedisStream("redis:6379"),
-# )
-
 streamback = Streamback(
     "main_app",
     streams="main=kafka://kafka:9092&feedback=redis://redis:6379&topics_prefix=stefanos-dev-topics",
-    log_level="DEBUG"
+    log_level="DEBUG",
 )
 
 #
 # d = {
 #     "kSAD ASD ASDA SDSAD-%s" % i: "vAS DASD ASD ASD -%s" % i for i in range(10)
 # }
+#
+# for i in range(1000):
+#     streamback.send("new_log2_fast", {"asdsadsad": "sadsadsad"}).flush()
 
-for i in range(1000000):
-    streamback.send("new_log", {
-        "asdsadsad": "sadsadsad"
-    }).flush()
-    time.sleep(0.01)
+for i in range(5000):
+    streamback.send("new_log2", {"asdsadsad": "sadsadsad"}).flush()
+
+
+time.sleep(10)
+#
+# for i in range(1000):
+#     streamback.send("new_log2", {
+#         "asdsadsad": "sadsadsad"
+#     }).flush()
+#
+#     time.sleep(0.01)
 
 # response = streamback.send("test_input", {
 #     "something1": "hello there",
 #     "something2": "hello there2"
 # }).flush()
 #
-# streamback.schedule(
-#     when="*/30 * * * * *",
-#     then="carzilla.send_grafana_stats",
-#     args={
-#         "something1": "hello there",
-#     },
-#     description="test the schedule blabla bla"
-# )
-#
-# streamback.schedule(
-#     when="23 0 10 * * *",
-#     then="carzilla.send_emails_to_new_users",
-#     args={
-#         "something1": "hello there",
-#     },
-#     description="Send emails at 10 to new users"
-# )
-#
-# streamback.start()
 
 
 # class Response(object):

@@ -46,6 +46,7 @@ class Streamback(object):
         futures_concurrency=0,
         futures_version=1,
         log_level="INFO",
+        group_instance_id=None,
         **kwargs
     ):
         self.initialize_logger(log_level)
@@ -66,6 +67,7 @@ class Streamback(object):
         self.futures_version = futures_version
         self.futures_concurrency = futures_concurrency
         self.pool_concurrency = pool_concurrency or [[0, 1]]
+        self.group_instance_id = group_instance_id
         self.scheduler = Scheduler(
             state=SchedulerState(
                 filepath=scheduler_state_file, state_ttl=scheduler_keep_state_ttl
@@ -326,8 +328,13 @@ class Streamback(object):
             self.close(listeners, reason="received terminate from master process")
             sys.exit(0)
 
-    def start_listeners(self, pipe, topics, listeners):
+    def start_listeners(self, pipe, topics, listeners, process_index=None):
         self.listeners = listeners
+        if isinstance(self.main_stream, KafkaStream) and self.group_instance_id:
+            computed_group_instance_id = self.group_instance_id
+            if "{counter}" in computed_group_instance_id and process_index is not None:
+                computed_group_instance_id = computed_group_instance_id.replace("{counter}", str(process_index))
+            self.main_stream.group_instance_id = computed_group_instance_id
         self.initialize_streams()
         self.on_fork()
 
@@ -386,7 +393,7 @@ class Streamback(object):
                 if self.feedback_stream and message.feedback_topic:
                     self.send_feedback_end(message.feedback_topic)
 
-    def _start_listener(self, pipe, topics, listeners):
+    def _start_listener(self, pipe, topics, listeners, process_index=None):
         def signal_handler(sig, frame):
             log(INFO, "LISTENER_PROCESS_KILLED[topics={topics}]".format(topics=topics))
             self.close(listeners, reason="listener process killed")
@@ -395,7 +402,7 @@ class Streamback(object):
         signal.signal(signal.SIGTERM, signal_handler)
 
         try:
-            self.start_listeners(pipe, topics, listeners)
+            self.start_listeners(pipe, topics, listeners, process_index=process_index)
         except KeyboardInterrupt as ex:
             self.close(listeners, reason="keyboard kill command")
         except Exception as ex:
